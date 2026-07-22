@@ -1,34 +1,40 @@
 # Smart CNC Manager — Professional Edition
 
-Applicazione Next.js + TypeScript con modalità demo locale e integrazione reale Firebase.
+Base professionale sviluppata con Next.js, React, TypeScript e Firebase.
 
-## Funzioni
-- Login e registrazione Email/Password
-- Dati isolati per utente in Cloud Firestore
-- Upload file in Firebase Cloud Storage con avanzamento
-- Eliminazione coordinata record + allegato
-- Modalità demo automatica senza credenziali Firebase
-- Dashboard, ricerca globale e moduli tecnici
+## Funzioni già incluse
+- Dashboard professionale responsive
+- Macchine, manuali, utensili, lavorazioni, allarmi, manutenzioni e Knowledge Base
+- Programmi CNC e materiali predisposti
+- Ricerca globale
+- Inserimento ed eliminazione elementi
+- Allegati predisposti
 - Backup e ripristino JSON
-- Progetto pronto per Vercel
+- Modalità demo locale
+- Firebase Authentication, Firestore e Storage predisposti
+- Regole Firestore e Storage per dati isolati per utente
 
-## Avvio locale
+## Avvio
 ```bash
 npm install
-cp .env.example .env.local
 npm run dev
 ```
+Apri http://localhost:3000
 
 ## Configurazione Firebase
-1. Crea un progetto su Firebase Console.
-2. In Authentication abilita **Email/Password**.
-3. Crea il database Cloud Firestore.
-4. Attiva Cloud Storage.
-5. Registra una Web App e copia la configurazione in `.env.local`.
-6. Pubblica `firestore.rules` e `storage.rules` dalla Console oppure con Firebase CLI.
+1. Crea un progetto Firebase.
+2. Attiva Authentication con Email/Password.
+3. Crea Firestore.
+4. Attiva Storage.
+5. Copia `.env.example` in `.env.local` e inserisci i valori Firebase.
+6. Pubblica `firestore.rules` e `storage.rules` dalla console Firebase.
 
-## Variabili Vercel
-Inserisci tutte le variabili `NEXT_PUBLIC_FIREBASE_*` anche in **Vercel → Project Settings → Environment Variables**.
+## Pubblicazione su Vercel
+Importa il repository in Vercel oppure esegui `vercel` dalla cartella del progetto. Aggiungi in Vercel le stesse variabili presenti in `.env.local`.
 
-## Sicurezza
-I dati sono salvati in `users/{uid}/records/{recordId}` e i file in `users/{uid}/{module}/{recordId}/...`. Le regole incluse impediscono l'accesso ai dati di altri utenti.
+## Stato corrente
+L'interfaccia funziona subito con dati locali. Il prossimo passaggio è sostituire il repository locale con il repository Firestore e attivare login e upload reali su Cloud Storage.
+
+## Versione 1.3 - Manuali e allegati
+
+La scheda macchina include ora una sezione per caricare, aprire, scaricare ed eliminare documenti tecnici. I metadati sono salvati in Firestore e i file in Firebase Storage, con un limite massimo di 100 MB per file.
