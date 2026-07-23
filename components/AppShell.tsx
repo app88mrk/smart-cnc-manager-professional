@@ -1,96 +1,365 @@
 "use client";
+
 import { useEffect, useMemo, useState } from "react";
-import { modules } from "@/lib/modules";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { LogOut, Menu, Search, X } from "lucide-react";
+
+import AuthScreen from "@/components/auth/AuthScreen";
+import ComingSoon from "@/components/common/ComingSoon";
+import Dashboard from "@/components/dashboard/Dashboard";
+import MachineDetail from "@/components/machines/MachineDetail";
+import MachineForm from "@/components/machines/MachineForm";
+import MachinesPage from "@/components/machines/MachinesPage";
+import MaintenanceForm from "@/components/maintenance/MaintenanceForm";
+import MaintenancePage from "@/components/maintenance/MaintenancePage";
+
 import { firebaseConfigured, auth } from "@/lib/firebase";
 import { listMachines, removeMachine, saveMachine } from "@/lib/machines";
-import { listMachineDocuments, removeMachineDocument, uploadMachineDocument } from "@/lib/documents";
-import { listMaintenance, removeMaintenance, saveMaintenance } from "@/lib/maintenance";
-import { Machine, MachineDocument, MaintenanceRecord, ModuleId } from "@/types";
-import Field from "@/components/common/Field";
-import Spec from "@/components/common/Spec";
-import { CalendarDays, Download, ExternalLink, FileText, LogOut, Menu, Pencil, Plus, Search, Trash2, Upload, Wrench, X } from "lucide-react";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import ComingSoon from "@/components/common/ComingSoon";
-import AuthScreen from "@/components/auth/AuthScreen";
-
-import Dashboard from "@/components/dashboard/Dashboard";
-
-
+import {
+  listMaintenance,
+  removeMaintenance,
+  saveMaintenance,
+} from "@/lib/maintenance";
+import { modules } from "@/lib/modules";
+import { Machine, MaintenanceRecord, ModuleId } from "@/types";
 
 const emptyMaintenance = (machineId = ""): MaintenanceRecord => ({
-  id: crypto.randomUUID(), machineId, type:"Preventiva", status:"Pianificata", title:"", description:"", technician:"", scheduledDate:new Date().toISOString().slice(0,10), completedDate:"", hours:"", cost:"", parts:"", createdAt:new Date().toISOString(), updatedAt:new Date().toISOString()
+  id: crypto.randomUUID(),
+  machineId,
+  type: "Preventiva",
+  status: "Pianificata",
+  title: "",
+  description: "",
+  technician: "",
+  scheduledDate: new Date().toISOString().slice(0, 10),
+  completedDate: "",
+  hours: "",
+  cost: "",
+  parts: "",
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
 });
 
 const emptyMachine = (): Machine => ({
-  id: crypto.randomUUID(), brand:"", model:"", serialNumber:"", year:"", cncControl:"", travelX:"", travelY:"", travelZ:"",
-  spindle:"", toolTaper:"", toolMagazine:"", department:"", status:"Operativa", notes:"", createdAt:new Date().toISOString(), updatedAt:new Date().toISOString()
+  id: crypto.randomUUID(),
+  brand: "",
+  model: "",
+  serialNumber: "",
+  year: "",
+  cncControl: "",
+  travelX: "",
+  travelY: "",
+  travelZ: "",
+  spindle: "",
+  toolTaper: "",
+  toolMagazine: "",
+  department: "",
+  status: "Operativa",
+  notes: "",
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
 });
 
-export default function AppShell(){
-  const [user,setUser]=useState<User|null>(null); const [authReady,setAuthReady]=useState(!firebaseConfigured); const [active,setActive]=useState<ModuleId>("dashboard");
-  const [machines,setMachines]=useState<Machine[]>([]); const [queryText,setQueryText]=useState(""); const [mobile,setMobile]=useState(false);
-  const [editing,setEditing]=useState<Machine|null>(null); const [detail,setDetail]=useState<Machine|null>(null); const [maintenance,setMaintenance]=useState<MaintenanceRecord[]>([]); const [editingMaintenance,setEditingMaintenance]=useState<MaintenanceRecord|null>(null); const [loading,setLoading]=useState(false); const [error,setError]=useState("");
-  const uid=user?.uid || "demo";
-  useEffect(()=>{ if(!auth) return; return onAuthStateChanged(auth,u=>{setUser(u);setAuthReady(true)}) },[]);
-  async function refresh(){ try{const [machineRows,maintenanceRows]=await Promise.all([listMachines(uid),listMaintenance(uid)]);setMachines(machineRows);setMaintenance(maintenanceRows)}catch(e){setError(errorMessage(e))} }
-  useEffect(()=>{ if(authReady && (!firebaseConfigured || user)) refresh() },[authReady,user]);
-  const visible=useMemo(()=>machines.filter(m=>Object.values(m).join(" ").toLowerCase().includes(queryText.toLowerCase())),[machines,queryText]);
-  async function handleDelete(machine:Machine){
-    if(!confirm(`Eliminare ${machine.brand} ${machine.model}?`)) return;
-    setLoading(true);
-    try{await removeMachine(uid,machine);await refresh()}catch(e){setError(errorMessage(e))}finally{setLoading(false)}
+export default function AppShell() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(!firebaseConfigured);
+  const [active, setActive] = useState<ModuleId>("dashboard");
+  const [machines, setMachines] = useState<Machine[]>([]);
+  const [queryText, setQueryText] = useState("");
+  const [mobile, setMobile] = useState(false);
+  const [editing, setEditing] = useState<Machine | null>(null);
+  const [detail, setDetail] = useState<Machine | null>(null);
+  const [maintenance, setMaintenance] = useState<MaintenanceRecord[]>([]);
+  const [editingMaintenance, setEditingMaintenance] =
+    useState<MaintenanceRecord | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const uid = user?.uid || "demo";
+
+  useEffect(() => {
+    if (!auth) {
+      return;
+    }
+
+    return onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthReady(true);
+    });
+  }, []);
+
+  async function refresh() {
+    try {
+      const [machineRows, maintenanceRows] = await Promise.all([
+        listMachines(uid),
+        listMaintenance(uid),
+      ]);
+
+      setMachines(machineRows);
+      setMaintenance(maintenanceRows);
+    } catch (refreshError) {
+      setError(errorMessage(refreshError));
+    }
   }
-  if(!authReady) return <div className="centerMessage">Connessione a Firebase…</div>;
+
+  useEffect(() => {
+    if (authReady && (!firebaseConfigured || user)) {
+      refresh();
+    }
+  }, [authReady, user]);
+
+  const visible = useMemo(
+    () =>
+      machines.filter((machine) =>
+        Object.values(machine)
+          .join(" ")
+          .toLowerCase()
+          .includes(queryText.toLowerCase())
+      ),
+    [machines, queryText]
+  );
+
+  async function handleDelete(machine: Machine) {
+    if (!confirm(`Eliminare ${machine.brand} ${machine.model}?`)) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await removeMachine(uid, machine);
+      await refresh();
+    } catch (deleteError) {
+      setError(errorMessage(deleteError));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!authReady) {
+    return (
+      <div className="centerMessage">Connessione a Firebase…</div>
+    );
+  }
+
   if (firebaseConfigured && !user) {
-  return <AuthScreen errorMessage={errorMessage} />;
+    return <AuthScreen errorMessage={errorMessage} />;
+  }
+
+  return (
+    <div className="app">
+      <header>
+        <button
+          className="mobileMenu"
+          onClick={() => setMobile(!mobile)}
+        >
+          <Menu />
+        </button>
+
+        <div className="brand">
+          <span>SC</span>
+          <div>
+            <b>Smart CNC Manager</b>
+            <small>Professional Edition</small>
+          </div>
+        </div>
+
+        <div className="globalSearch">
+          <Search size={18} />
+          <input
+            value={queryText}
+            onChange={(event) => setQueryText(event.target.value)}
+            placeholder="Cerca macchina, matricola, controllo…"
+          />
+        </div>
+
+        <div
+          className={`cloud ${
+            firebaseConfigured ? "online" : "demo"
+          }`}
+        >
+          <i />
+          {firebaseConfigured
+            ? "Firebase connesso"
+            : "Modalità demo"}
+        </div>
+
+        {user && (
+          <button
+            className="logout"
+            onClick={() => auth && signOut(auth)}
+            title="Esci"
+          >
+            <LogOut size={18} />
+          </button>
+        )}
+      </header>
+
+      <aside className={mobile ? "show" : ""}>
+        <nav>
+          {modules.map((module) => (
+            <button
+              key={module.id}
+              className={active === module.id ? "active" : ""}
+              onClick={() => {
+                setActive(module.id);
+                setMobile(false);
+              }}
+            >
+              <span>{module.icon}</span>
+
+              <div>
+                <b>{module.label}</b>
+                <small>{module.description}</small>
+              </div>
+
+              {module.state !== "active" && (
+                <em>
+                  {module.state === "config"
+                    ? "Configura"
+                    : "Standby"}
+                </em>
+              )}
+            </button>
+          ))}
+        </nav>
+      </aside>
+
+      <main>
+        {error && (
+          <div className="alert">
+            {error}
+            <button onClick={() => setError("")}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {active === "dashboard" ? (
+          <Dashboard
+            machines={machines}
+            maintenance={maintenance}
+            go={setActive}
+          />
+        ) : active === "machines" ? (
+          <MachinesPage
+            machines={visible}
+            openNew={() => setEditing(emptyMachine())}
+            openEdit={setEditing}
+            openDetail={setDetail}
+            onDelete={handleDelete}
+          />
+        ) : active === "maintenance" ? (
+          <MaintenancePage
+            records={maintenance}
+            machines={machines}
+            openNew={() =>
+              setEditingMaintenance(emptyMaintenance())
+            }
+            openEdit={setEditingMaintenance}
+            onDelete={async (record) => {
+              if (
+                !confirm(
+                  `Eliminare l’intervento ${record.title}?`
+                )
+              ) {
+                return;
+              }
+
+              try {
+                await removeMaintenance(uid, record.id);
+                await refresh();
+              } catch (deleteError) {
+                setError(errorMessage(deleteError));
+              }
+            }}
+          />
+        ) : (
+          <ComingSoon active={active} />
+        )}
+      </main>
+
+      {editing && (
+        <MachineForm
+          machine={editing}
+          busy={loading}
+          close={() => setEditing(null)}
+          submit={async (machine, photo) => {
+            setLoading(true);
+
+            try {
+              await saveMachine(
+                uid,
+                {
+                  ...machine,
+                  updatedAt: new Date().toISOString(),
+                },
+                photo
+              );
+
+              await refresh();
+              setEditing(null);
+            } catch (saveError) {
+              setError(errorMessage(saveError));
+            } finally {
+              setLoading(false);
+            }
+          }}
+        />
+      )}
+
+      {detail && (
+        <MachineDetail
+          uid={uid}
+          machine={detail}
+          maintenance={maintenance.filter(
+            (record) => record.machineId === detail.id
+          )}
+          close={() => setDetail(null)}
+          edit={() => {
+            setEditing(detail);
+            setDetail(null);
+          }}
+          addMaintenance={() =>
+            setEditingMaintenance(emptyMaintenance(detail.id))
+          }
+          onError={setError}
+        />
+      )}
+
+      {editingMaintenance && (
+        <MaintenanceForm
+          record={editingMaintenance}
+          machines={machines}
+          busy={loading}
+          close={() => setEditingMaintenance(null)}
+          submit={async (record) => {
+            setLoading(true);
+
+            try {
+              await saveMaintenance(uid, {
+                ...record,
+                updatedAt: new Date().toISOString(),
+              });
+
+              await refresh();
+              setEditingMaintenance(null);
+            } catch (saveError) {
+              setError(errorMessage(saveError));
+            } finally {
+              setLoading(false);
+            }
+          }}
+        />
+      )}
+    </div>
+  );
 }
-  return <div className="app">
-    <header><button className="mobileMenu" onClick={()=>setMobile(!mobile)}><Menu/></button><div className="brand"><span>SC</span><div><b>Smart CNC Manager</b><small>Professional Edition</small></div></div><div className="globalSearch"><Search size={18}/><input value={queryText} onChange={e=>setQueryText(e.target.value)} placeholder="Cerca macchina, matricola, controllo…"/></div><div className={`cloud ${firebaseConfigured?"online":"demo"}`}><i/>{firebaseConfigured?"Firebase connesso":"Modalità demo"}</div>{user&&<button className="logout" onClick={()=>auth&&signOut(auth)} title="Esci"><LogOut size={18}/></button>}</header>
-    <aside className={mobile?"show":""}><nav>{modules.map(m=><button key={m.id} className={active===m.id?"active":""} onClick={()=>{setActive(m.id);setMobile(false)}}><span>{m.icon}</span><div><b>{m.label}</b><small>{m.description}</small></div>{m.state!=="active"&&<em>{m.state==="config"?"Configura":"Standby"}</em>}</button>)}</nav></aside>
-    <main>{error&&<div className="alert">{error}<button onClick={()=>setError("")}><X size={16}/></button></div>}{active==="dashboard"?<Dashboard machines={machines} maintenance={maintenance} go={setActive}/>:active==="machines"?<MachinesPage machines={visible} openNew={()=>setEditing(emptyMachine())} openEdit={setEditing} openDetail={setDetail} onDelete={handleDelete}/>:active==="maintenance"?<MaintenancePage records={maintenance} machines={machines} openNew={()=>setEditingMaintenance(emptyMaintenance())} openEdit={setEditingMaintenance} onDelete={async r=>{if(!confirm(`Eliminare l’intervento ${r.title}?`))return;try{await removeMaintenance(uid,r.id);await refresh()}catch(e){setError(errorMessage(e))}}}/>:<ComingSoon active={active}/>}</main>
-    {editing&&<MachineForm machine={editing} busy={loading} close={()=>setEditing(null)} submit={async(machine,photo)=>{setLoading(true);try{await saveMachine(uid,{...machine,updatedAt:new Date().toISOString()},photo);await refresh();setEditing(null)}catch(e){setError(errorMessage(e))}finally{setLoading(false)}}}/>} 
-    {detail&&<MachineDetail uid={uid} machine={detail} maintenance={maintenance.filter(r=>r.machineId===detail.id)} close={()=>setDetail(null)} edit={()=>{setEditing(detail);setDetail(null)}} addMaintenance={()=>setEditingMaintenance(emptyMaintenance(detail.id))} onError={setError}/>}
-    {editingMaintenance&&<MaintenanceForm record={editingMaintenance} machines={machines} busy={loading} close={()=>setEditingMaintenance(null)} submit={async record=>{setLoading(true);try{await saveMaintenance(uid,{...record,updatedAt:new Date().toISOString()});await refresh();setEditingMaintenance(null)}catch(e){setError(errorMessage(e))}finally{setLoading(false)}}}/>}
-  </div>
+
+function errorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Si è verificato un errore.";
 }
-
-
-
-function MachinesPage({machines,openNew,openEdit,openDetail,onDelete}:{machines:Machine[];openNew:()=>void;openEdit:(m:Machine)=>void;openDetail:(m:Machine)=>void;onDelete:(m:Machine)=>void}){return <><div className="pageHead"><div><p>PARCO MACCHINE</p><h1>Macchine</h1><span>Schede tecniche, foto e dati identificativi.</span></div><button className="primary" onClick={openNew}><Plus size={18}/> Nuova macchina</button></div><section className="machineGrid">{machines.length?machines.map(m=><article className="machineCard" key={m.id}><button className="machinePhoto" onClick={()=>openDetail(m)}>{m.photoUrl?<img src={m.photoUrl} alt={`${m.brand} ${m.model}`}/>:<span>▦</span>}</button><div className="machineBody"><div className="machineTop"><span className={`statusBadge ${statusClass(m.status)}`}>{m.status}</span><div className="cardActions"><button onClick={()=>openEdit(m)} title="Modifica"><Pencil size={16}/></button><button onClick={()=>onDelete(m)} title="Elimina"><Trash2 size={16}/></button></div></div><button className="machineTitle" onClick={()=>openDetail(m)}><h3>{m.brand||"Marca"} {m.model||"Modello"}</h3><p>{m.serialNumber?`Matricola ${m.serialNumber}`:"Matricola non inserita"}</p></button><dl><div><dt>Controllo</dt><dd>{m.cncControl||"—"}</dd></div><div><dt>Reparto</dt><dd>{m.department||"—"}</dd></div></dl><button className="openDetail" onClick={()=>openDetail(m)}>Apri scheda</button></div></article>):<div className="empty"><strong>Nessuna macchina trovata</strong><span>Crea la prima scheda oppure modifica la ricerca.</span><button className="primary" onClick={openNew}><Plus size={17}/> Nuova macchina</button></div>}</section></>}
-
-function MachineForm({machine,busy,close,submit}:{machine:Machine;busy:boolean;close:()=>void;submit:(m:Machine,p:File|null)=>void}){const [form,setForm]=useState(machine);const [photo,setPhoto]=useState<File|null>(null);const set=(key:keyof Machine,value:string)=>setForm(v=>({...v,[key]:value}));return <div className="modal"><form onSubmit={e=>{e.preventDefault();submit(form,photo)}}><div className="modalHead"><div><small>SCHEDA MACCHINA</small><h2>{machine.brand||machine.model?"Modifica macchina":"Nuova macchina"}</h2></div><button type="button" onClick={close}><X/></button></div><div className="formGrid"><Field label="Marca" value={form.brand} set={v=>set("brand",v)} required/><Field label="Modello" value={form.model} set={v=>set("model",v)} required/><Field label="Matricola" value={form.serialNumber} set={v=>set("serialNumber",v)}/><Field label="Anno" value={form.year} set={v=>set("year",v)} type="number"/><Field label="Controllo CNC" value={form.cncControl} set={v=>set("cncControl",v)}/><label><span>Stato</span><select value={form.status} onChange={e=>set("status",e.target.value)}><option>Operativa</option><option>Manutenzione</option><option>Fuori servizio</option><option>Dismessa</option></select></label><Field label="Corsa X (mm)" value={form.travelX} set={v=>set("travelX",v)}/><Field label="Corsa Y (mm)" value={form.travelY} set={v=>set("travelY",v)}/><Field label="Corsa Z (mm)" value={form.travelZ} set={v=>set("travelZ",v)}/><Field label="Mandrino" value={form.spindle} set={v=>set("spindle",v)}/><Field label="Attacco utensile" value={form.toolTaper} set={v=>set("toolTaper",v)}/><Field label="Magazzino utensili" value={form.toolMagazine} set={v=>set("toolMagazine",v)}/><Field label="Reparto / posizione" value={form.department} set={v=>set("department",v)} full/><label className="full"><span>Note tecniche</span><textarea value={form.notes} onChange={e=>set("notes",e.target.value)}/></label><label className="full upload"><Upload/><span>{photo?photo.name:form.photoUrl?"Sostituisci foto macchina":"Carica foto macchina"}</span><input type="file" accept="image/*" onChange={e=>setPhoto(e.target.files?.[0]||null)}/></label></div><div className="modalActions"><button type="button" onClick={close}>Annulla</button><button className="primary" disabled={busy}>{busy?"Salvataggio…":"Salva macchina"}</button></div></form></div>}
-
-
-function MachineDetail({uid,machine,maintenance,close,edit,addMaintenance,onError}:{uid:string;machine:Machine;maintenance:MaintenanceRecord[];close:()=>void;edit:()=>void;addMaintenance:()=>void;onError:(message:string)=>void}){return <div className="modal"><div className="detailCard"><div className="detailHero">{machine.photoUrl?<img src={machine.photoUrl} alt={`${machine.brand} ${machine.model}`}/>:<div className="detailPlaceholder">▦</div>}<button onClick={close}><X/></button></div><div className="detailContent"><div className="detailHeading"><div><span className={`statusBadge ${statusClass(machine.status)}`}>{machine.status}</span><h2>{machine.brand} {machine.model}</h2><p>{machine.serialNumber?`Matricola ${machine.serialNumber}`:"Matricola non inserita"}</p></div><button className="primary" onClick={edit}><Pencil size={17}/> Modifica</button></div><section className="specGrid"><Spec label="Anno" value={machine.year}/><Spec label="Controllo CNC" value={machine.cncControl}/><Spec label="Corsa X" value={unit(machine.travelX)}/><Spec label="Corsa Y" value={unit(machine.travelY)}/><Spec label="Corsa Z" value={unit(machine.travelZ)}/><Spec label="Mandrino" value={machine.spindle}/><Spec label="Attacco utensile" value={machine.toolTaper}/><Spec label="Magazzino" value={machine.toolMagazine}/><Spec label="Reparto" value={machine.department}/></section>{machine.notes&&<div className="notesBox"><b>Note tecniche</b><p>{machine.notes}</p></div>}<MachineMaintenance records={maintenance} add={addMaintenance}/><MachineDocuments uid={uid} machineId={machine.id} onError={onError}/></div></div></div>}
-
-function MachineDocuments({uid,machineId,onError}:{uid:string;machineId:string;onError:(message:string)=>void}){
-  const [documents,setDocuments]=useState<MachineDocument[]>([]);
-  const [busy,setBusy]=useState(false);
-  const [loading,setLoading]=useState(true);
-  async function refreshDocuments(){setLoading(true);try{setDocuments(await listMachineDocuments(uid,machineId))}catch(e){onError(errorMessage(e))}finally{setLoading(false)}}
-  useEffect(()=>{refreshDocuments()},[uid,machineId]);
-  async function uploadFiles(files:FileList|null){if(!files?.length)return;setBusy(true);try{for(const file of Array.from(files))await uploadMachineDocument(uid,machineId,file);await refreshDocuments()}catch(e){onError(errorMessage(e))}finally{setBusy(false)}}
-  async function remove(document:MachineDocument){if(!confirm(`Eliminare ${document.name}?`))return;setBusy(true);try{await removeMachineDocument(uid,document);await refreshDocuments()}catch(e){onError(errorMessage(e))}finally{setBusy(false)}}
-  return <section className="documentsBox"><div className="documentsHead"><div><b>Manuali e allegati</b><span>PDF, schemi, backup CNC, immagini e documenti tecnici.</span></div><label className={`documentUpload ${busy?"disabled":""}`}><Upload size={17}/>{busy?"Caricamento…":"Carica file"}<input type="file" multiple disabled={busy} onChange={e=>{uploadFiles(e.target.files);e.currentTarget.value=""}}/></label></div>{loading?<div className="documentsEmpty">Caricamento documenti…</div>:documents.length?<div className="documentList">{documents.map(document=><div className="documentRow" key={document.id}><span className="documentIcon"><FileText size={20}/></span><div className="documentInfo"><b>{document.name}</b><span>{formatBytes(document.size)} · {formatDate(document.createdAt)}</span></div><div className="documentActions"><a href={document.downloadUrl} target="_blank" rel="noreferrer" title="Apri"><ExternalLink size={17}/></a><a href={document.downloadUrl} download={document.name} title="Scarica"><Download size={17}/></a><button type="button" onClick={()=>remove(document)} disabled={busy} title="Elimina"><Trash2 size={17}/></button></div></div>)}</div>:<div className="documentsEmpty"><FileText size={25}/><b>Nessun documento caricato</b><span>Usa “Carica file” per aggiungere il primo allegato.</span></div>}</section>
-}
-
-
-function MaintenancePage({records,machines,openNew,openEdit,onDelete}:{records:MaintenanceRecord[];machines:Machine[];openNew:()=>void;openEdit:(r:MaintenanceRecord)=>void;onDelete:(r:MaintenanceRecord)=>void}){
-  const machineName=(id:string)=>{const m=machines.find(x=>x.id===id);return m?`${m.brand} ${m.model}`:"Macchina non disponibile"};
-  return <><div className="pageHead"><div><p>GESTIONE INTERVENTI</p><h1>Manutenzioni</h1><span>Interventi preventivi, guasti, tecnici, ore e costi.</span></div><button className="primary" onClick={openNew}><Plus size={18}/> Nuovo intervento</button></div><section className="maintenanceGrid">{records.length?records.map(r=><article className="maintenanceCard" key={r.id}><div className="maintenanceTop"><span className={`statusBadge ${statusClass(r.status)}`}>{r.status}</span><div className="cardActions"><button onClick={()=>openEdit(r)}><Pencil size={16}/></button><button onClick={()=>onDelete(r)}><Trash2 size={16}/></button></div></div><h3>{r.title||"Intervento"}</h3><p>{machineName(r.machineId)}</p><div className="maintenanceMeta"><span><CalendarDays size={15}/>{formatDate(r.scheduledDate)}</span><span><Wrench size={15}/>{r.type}</span></div><dl><div><dt>Tecnico</dt><dd>{r.technician||"—"}</dd></div><div><dt>Costo</dt><dd>{r.cost?`€ ${r.cost}`:"—"}</dd></div></dl></article>):<div className="empty"><strong>Nessun intervento registrato</strong><span>Crea la prima manutenzione programmata o correttiva.</span><button className="primary" onClick={openNew}><Plus size={17}/> Nuovo intervento</button></div>}</section></>
-}
-
-function MaintenanceForm({record,machines,busy,close,submit}:{record:MaintenanceRecord;machines:Machine[];busy:boolean;close:()=>void;submit:(r:MaintenanceRecord)=>void}){
-  const [form,setForm]=useState(record); const set=(key:keyof MaintenanceRecord,value:string)=>setForm(v=>({...v,[key]:value}));
-  return <div className="modal"><form onSubmit={e=>{e.preventDefault();submit(form)}}><div className="modalHead"><div><small>INTERVENTO</small><h2>{record.title?"Modifica manutenzione":"Nuova manutenzione"}</h2></div><button type="button" onClick={close}><X/></button></div><div className="formGrid"><label><span>Macchina</span><select value={form.machineId} onChange={e=>set("machineId",e.target.value)} required><option value="">Seleziona macchina</option>{machines.map(m=><option key={m.id} value={m.id}>{m.brand} {m.model}</option>)}</select></label><Field label="Titolo intervento" value={form.title} set={v=>set("title",v)} required/><label><span>Tipo</span><select value={form.type} onChange={e=>set("type",e.target.value)}><option>Preventiva</option><option>Correttiva</option><option>Guasto</option><option>Ispezione</option></select></label><label><span>Stato</span><select value={form.status} onChange={e=>set("status",e.target.value)}><option>Pianificata</option><option>In corso</option><option>Completata</option></select></label><Field label="Data pianificata" value={form.scheduledDate} set={v=>set("scheduledDate",v)} type="date" required/><Field label="Data completamento" value={form.completedDate} set={v=>set("completedDate",v)} type="date"/><Field label="Tecnico" value={form.technician} set={v=>set("technician",v)}/><Field label="Ore impiegate" value={form.hours} set={v=>set("hours",v)} type="number"/><Field label="Costo (€)" value={form.cost} set={v=>set("cost",v)} type="number"/><Field label="Ricambi utilizzati" value={form.parts} set={v=>set("parts",v)}/><label className="full"><span>Descrizione e note</span><textarea value={form.description} onChange={e=>set("description",e.target.value)}/></label></div><div className="modalActions"><button type="button" onClick={close}>Annulla</button><button className="primary" disabled={busy}>{busy?"Salvataggio…":"Salva intervento"}</button></div></form></div>
-}
-
-function MachineMaintenance({records,add}:{records:MaintenanceRecord[];add:()=>void}){return <section className="machineMaintenance"><div className="documentsHead"><div><b>Storico manutenzioni</b><span>Interventi collegati a questa macchina.</span></div><button className="primary" onClick={add}><Plus size={17}/> Intervento</button></div>{records.length?<div className="maintenanceRows">{records.slice(0,6).map(r=><div key={r.id}><span className={`statusBadge ${statusClass(r.status)}`}>{r.status}</span><div><b>{r.title}</b><small>{r.type} · {formatDate(r.scheduledDate)} · {r.technician||"Tecnico non indicato"}</small></div></div>)}</div>:<div className="documentsEmpty"><Wrench size={25}/><b>Nessun intervento</b><span>Aggiungi la prima manutenzione della macchina.</span></div>}</section>}
-
-
-
-function statusClass(status:string){return status.toLowerCase().replaceAll(" ","-")}
-function unit(v:string){return v?`${v} mm`:"—"}
-function formatBytes(bytes:number){if(bytes<1024)return `${bytes} B`;if(bytes<1024*1024)return `${(bytes/1024).toFixed(1)} KB`;return `${(bytes/(1024*1024)).toFixed(1)} MB`}
-function formatDate(value:string){return new Intl.DateTimeFormat("it-IT",{day:"2-digit",month:"2-digit",year:"numeric"}).format(new Date(value))}
-function errorMessage(e:unknown){if(e instanceof Error)return e.message;return "Si è verificato un errore."}
