@@ -12,7 +12,8 @@ import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndP
 import { CalendarDays, Download, ExternalLink, FileText, LogOut, Menu, Pencil, Plus, Search, Trash2, Upload, Wrench, X } from "lucide-react";
 import Kpi from "@/components/dashboard/Kpi";
 import ComingSoon from "@/components/common/ComingSoon";
-
+import AuthScreen from "@/components/auth/AuthScreen";
+import { ok } from "assert";
 
 
 
@@ -41,7 +42,9 @@ export default function AppShell(){
     try{await removeMachine(uid,machine);await refresh()}catch(e){setError(errorMessage(e))}finally{setLoading(false)}
   }
   if(!authReady) return <div className="centerMessage">Connessione a Firebase…</div>;
-  if(firebaseConfigured && !user) return <AuthScreen/>;
+  if (firebaseConfigured && !user) {
+  return <AuthScreen errorMessage={errorMessage} />;
+}
   return <div className="app">
     <header><button className="mobileMenu" onClick={()=>setMobile(!mobile)}><Menu/></button><div className="brand"><span>SC</span><div><b>Smart CNC Manager</b><small>Professional Edition</small></div></div><div className="globalSearch"><Search size={18}/><input value={queryText} onChange={e=>setQueryText(e.target.value)} placeholder="Cerca macchina, matricola, controllo…"/></div><div className={`cloud ${firebaseConfigured?"online":"demo"}`}><i/>{firebaseConfigured?"Firebase connesso":"Modalità demo"}</div>{user&&<button className="logout" onClick={()=>auth&&signOut(auth)} title="Esci"><LogOut size={18}/></button>}</header>
     <aside className={mobile?"show":""}><nav>{modules.map(m=><button key={m.id} className={active===m.id?"active":""} onClick={()=>{setActive(m.id);setMobile(false)}}><span>{m.icon}</span><div><b>{m.label}</b><small>{m.description}</small></div>{m.state!=="active"&&<em>{m.state==="config"?"Configura":"Standby"}</em>}</button>)}</nav></aside>
@@ -51,8 +54,6 @@ export default function AppShell(){
     {editingMaintenance&&<MaintenanceForm record={editingMaintenance} machines={machines} busy={loading} close={()=>setEditingMaintenance(null)} submit={async record=>{setLoading(true);try{await saveMaintenance(uid,{...record,updatedAt:new Date().toISOString()});await refresh();setEditingMaintenance(null)}catch(e){setError(errorMessage(e))}finally{setLoading(false)}}}/>}
   </div>
 }
-
-function AuthScreen(){const [register,setRegister]=useState(false);const [error,setError]=useState("");const [busy,setBusy]=useState(false);async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();if(!auth)return;const fd=new FormData(e.currentTarget);setBusy(true);setError("");try{const email=String(fd.get("email"));const password=String(fd.get("password"));if(register)await createUserWithEmailAndPassword(auth,email,password);else await signInWithEmailAndPassword(auth,email,password)}catch(e){setError(errorMessage(e))}finally{setBusy(false)}}return <div className="authPage"><form className="authCard" onSubmit={submit}><div className="brand authBrand"><span>SC</span><div><b>Smart CNC Manager</b><small>Professional Edition</small></div></div><h1>{register?"Crea account":"Accesso personale"}</h1><p>I dati e i file saranno protetti nel tuo spazio Firebase.</p>{error&&<div className="authError">{error}</div>}<label>Email<input name="email" type="email" required autoComplete="email"/></label><label>Password<input name="password" type="password" required minLength={6} autoComplete={register?"new-password":"current-password"}/></label><button className="primary" disabled={busy}>{busy?"Attendere…":register?"Crea account":"Accedi"}</button><button type="button" className="linkButton" onClick={()=>setRegister(!register)}>{register?"Hai già un account? Accedi":"Primo accesso? Crea account"}</button></form></div>}
 
 function Dashboard({machines,maintenance,go}:{machines:Machine[];maintenance:MaintenanceRecord[];go:(id:ModuleId)=>void}){const overdue=maintenance.filter(r=>r.status!=="Completata"&&r.scheduledDate&&r.scheduledDate<new Date().toISOString().slice(0,10)).length;return <><div className="pageHead"><div><p>CONTROLLO REPARTO</p><h1>Dashboard operativa</h1><span>Tutte le informazioni tecniche in un unico sistema.</span></div><button className="primary" onClick={()=>go("machines")}>Apri Macchine</button></div><section className="kpis"><Kpi label="Macchine" value={machines.length} icon="▦"/><Kpi label="Operative" value={machines.filter(m=>m.status==="Operativa").length} icon="✓"/><Kpi label="In manutenzione" value={machines.filter(m=>m.status==="Manutenzione").length} icon="◆"/><Kpi label="Manutenzioni aperte" value={maintenance.filter(r=>r.status!=="Completata").length} icon="◆"/><Kpi label="Scadute" value={overdue} icon="⚠"/></section><section className="panel dashboardPanel"><h2>Le tue macchine</h2>{machines.length?<div className="miniMachines">{machines.slice(0,5).map(m=><button key={m.id} onClick={()=>go("machines")}><b>{m.brand} {m.model}</b><span>{m.serialNumber||"Matricola non inserita"}</span><em>{m.status}</em></button>)}</div>:<div className="empty"><strong>Nessuna macchina inserita</strong><span>Apri il modulo Macchine per creare la prima scheda.</span></div>}</section></>}
 
