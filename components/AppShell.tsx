@@ -1,5 +1,5 @@
 "use client";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { modules } from "@/lib/modules";
 import { firebaseConfigured, auth } from "@/lib/firebase";
 import { listMachines, removeMachine, saveMachine } from "@/lib/machines";
@@ -8,13 +8,12 @@ import { listMaintenance, removeMaintenance, saveMaintenance } from "@/lib/maint
 import { Machine, MachineDocument, MaintenanceRecord, ModuleId } from "@/types";
 import Field from "@/components/common/Field";
 import Spec from "@/components/common/Spec";
-import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut, User } from "firebase/auth";
 import { CalendarDays, Download, ExternalLink, FileText, LogOut, Menu, Pencil, Plus, Search, Trash2, Upload, Wrench, X } from "lucide-react";
-import Kpi from "@/components/dashboard/Kpi";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import ComingSoon from "@/components/common/ComingSoon";
 import AuthScreen from "@/components/auth/AuthScreen";
-import { ok } from "assert";
 
+import Dashboard from "@/components/dashboard/Dashboard";
 
 
 
@@ -55,7 +54,6 @@ export default function AppShell(){
   </div>
 }
 
-function Dashboard({machines,maintenance,go}:{machines:Machine[];maintenance:MaintenanceRecord[];go:(id:ModuleId)=>void}){const overdue=maintenance.filter(r=>r.status!=="Completata"&&r.scheduledDate&&r.scheduledDate<new Date().toISOString().slice(0,10)).length;return <><div className="pageHead"><div><p>CONTROLLO REPARTO</p><h1>Dashboard operativa</h1><span>Tutte le informazioni tecniche in un unico sistema.</span></div><button className="primary" onClick={()=>go("machines")}>Apri Macchine</button></div><section className="kpis"><Kpi label="Macchine" value={machines.length} icon="▦"/><Kpi label="Operative" value={machines.filter(m=>m.status==="Operativa").length} icon="✓"/><Kpi label="In manutenzione" value={machines.filter(m=>m.status==="Manutenzione").length} icon="◆"/><Kpi label="Manutenzioni aperte" value={maintenance.filter(r=>r.status!=="Completata").length} icon="◆"/><Kpi label="Scadute" value={overdue} icon="⚠"/></section><section className="panel dashboardPanel"><h2>Le tue macchine</h2>{machines.length?<div className="miniMachines">{machines.slice(0,5).map(m=><button key={m.id} onClick={()=>go("machines")}><b>{m.brand} {m.model}</b><span>{m.serialNumber||"Matricola non inserita"}</span><em>{m.status}</em></button>)}</div>:<div className="empty"><strong>Nessuna macchina inserita</strong><span>Apri il modulo Macchine per creare la prima scheda.</span></div>}</section></>}
 
 
 function MachinesPage({machines,openNew,openEdit,openDetail,onDelete}:{machines:Machine[];openNew:()=>void;openEdit:(m:Machine)=>void;openDetail:(m:Machine)=>void;onDelete:(m:Machine)=>void}){return <><div className="pageHead"><div><p>PARCO MACCHINE</p><h1>Macchine</h1><span>Schede tecniche, foto e dati identificativi.</span></div><button className="primary" onClick={openNew}><Plus size={18}/> Nuova macchina</button></div><section className="machineGrid">{machines.length?machines.map(m=><article className="machineCard" key={m.id}><button className="machinePhoto" onClick={()=>openDetail(m)}>{m.photoUrl?<img src={m.photoUrl} alt={`${m.brand} ${m.model}`}/>:<span>▦</span>}</button><div className="machineBody"><div className="machineTop"><span className={`statusBadge ${statusClass(m.status)}`}>{m.status}</span><div className="cardActions"><button onClick={()=>openEdit(m)} title="Modifica"><Pencil size={16}/></button><button onClick={()=>onDelete(m)} title="Elimina"><Trash2 size={16}/></button></div></div><button className="machineTitle" onClick={()=>openDetail(m)}><h3>{m.brand||"Marca"} {m.model||"Modello"}</h3><p>{m.serialNumber?`Matricola ${m.serialNumber}`:"Matricola non inserita"}</p></button><dl><div><dt>Controllo</dt><dd>{m.cncControl||"—"}</dd></div><div><dt>Reparto</dt><dd>{m.department||"—"}</dd></div></dl><button className="openDetail" onClick={()=>openDetail(m)}>Apri scheda</button></div></article>):<div className="empty"><strong>Nessuna macchina trovata</strong><span>Crea la prima scheda oppure modifica la ricerca.</span><button className="primary" onClick={openNew}><Plus size={17}/> Nuova macchina</button></div>}</section></>}
