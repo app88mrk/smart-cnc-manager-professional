@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { LogOut, Menu, Search, X } from "lucide-react";
 
@@ -13,8 +13,8 @@ import MachinesPage from "@/components/machines/MachinesPage";
 import MaintenanceForm from "@/components/maintenance/MaintenanceForm";
 import MaintenancePage from "@/components/maintenance/MaintenancePage";
 
+import useMachines from "@/hooks/useMachines";
 import { firebaseConfigured, auth } from "@/lib/firebase";
-import { listMachines, removeMachine, saveMachine } from "@/lib/machines";
 import {
   listMaintenance,
   removeMaintenance,
@@ -64,7 +64,6 @@ export default function AppShell() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(!firebaseConfigured);
   const [active, setActive] = useState<ModuleId>("dashboard");
-  const [machines, setMachines] = useState<Machine[]>([]);
   const [queryText, setQueryText] = useState("");
   const [mobile, setMobile] = useState(false);
   const [editing, setEditing] = useState<Machine | null>(null);
@@ -72,10 +71,26 @@ export default function AppShell() {
   const [maintenance, setMaintenance] = useState<MaintenanceRecord[]>([]);
   const [editingMaintenance, setEditingMaintenance] =
     useState<MaintenanceRecord | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
   const [error, setError] = useState("");
 
   const uid = user?.uid || "demo";
+  const dataEnabled = authReady && (!firebaseConfigured || Boolean(user));
+
+  const showError = useCallback((message: string) => {
+    setError(message);
+  }, []);
+
+  const {
+    machines,
+    machinesLoading,
+    saveMachine,
+    deleteMachine,
+  } = useMachines({
+    uid,
+    enabled: dataEnabled,
+    onError: showError,
+  });
 
   useEffect(() => {
     if (!auth) {
@@ -88,25 +103,25 @@ export default function AppShell() {
     });
   }, []);
 
-  async function refresh() {
-    try {
-      const [machineRows, maintenanceRows] = await Promise.all([
-        listMachines(uid),
-        listMaintenance(uid),
-      ]);
+  const refreshMaintenance = useCallback(async () => {
+    if (!dataEnabled) {
+      return;
+    }
 
-      setMachines(machineRows);
-      setMaintenance(maintenanceRows);
+    setMaintenanceLoading(true);
+
+    try {
+      setMaintenance(await listMaintenance(uid));
     } catch (refreshError) {
       setError(errorMessage(refreshError));
+    } finally {
+      setMaintenanceLoading(false);
     }
-  }
+  }, [dataEnabled, uid]);
 
   useEffect(() => {
-    if (authReady && (!firebaseConfigured || user)) {
-      refresh();
-    }
-  }, [authReady, user]);
+    refreshMaintenance();
+  }, [refreshMaintenance]);
 
   const visible = useMemo(
     () =>
@@ -124,15 +139,10 @@ export default function AppShell() {
       return;
     }
 
-    setLoading(true);
-
     try {
-      await removeMachine(uid, machine);
-      await refresh();
-    } catch (deleteError) {
-      setError(errorMessage(deleteError));
-    } finally {
-      setLoading(false);
+      await deleteMachine(machine);
+    } catch {
+      // L'errore viene già mostrato da useMachines.
     }
   }
 
@@ -268,7 +278,7 @@ export default function AppShell() {
 
               try {
                 await removeMaintenance(uid, record.id);
-                await refresh();
+                await refreshMaintenance();
               } catch (deleteError) {
                 setError(errorMessage(deleteError));
               }
@@ -282,27 +292,14 @@ export default function AppShell() {
       {editing && (
         <MachineForm
           machine={editing}
-          busy={loading}
+          busy={machinesLoading}
           close={() => setEditing(null)}
           submit={async (machine, photo) => {
-            setLoading(true);
-
             try {
-              await saveMachine(
-                uid,
-                {
-                  ...machine,
-                  updatedAt: new Date().toISOString(),
-                },
-                photo
-              );
-
-              await refresh();
+              await saveMachine({ machine, photo });
               setEditing(null);
-            } catch (saveError) {
-              setError(errorMessage(saveError));
-            } finally {
-              setLoading(false);
+            } catch {
+              // L'errore viene già mostrato da useMachines.
             }
           }}
         />
@@ -331,10 +328,10 @@ export default function AppShell() {
         <MaintenanceForm
           record={editingMaintenance}
           machines={machines}
-          busy={loading}
+          busy={maintenanceLoading}
           close={() => setEditingMaintenance(null)}
           submit={async (record) => {
-            setLoading(true);
+            setMaintenanceLoading(true);
 
             try {
               await saveMaintenance(uid, {
@@ -342,12 +339,12 @@ export default function AppShell() {
                 updatedAt: new Date().toISOString(),
               });
 
-              await refresh();
+              await refreshMaintenance();
               setEditingMaintenance(null);
             } catch (saveError) {
               setError(errorMessage(saveError));
             } finally {
-              setLoading(false);
+              setMaintenanceLoading(false);
             }
           }}
         />
