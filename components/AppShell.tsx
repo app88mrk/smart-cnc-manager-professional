@@ -14,12 +14,8 @@ import MaintenanceForm from "@/components/maintenance/MaintenanceForm";
 import MaintenancePage from "@/components/maintenance/MaintenancePage";
 
 import useMachines from "@/hooks/useMachines";
+import useMaintenance from "@/hooks/useMaintenance";
 import { firebaseConfigured, auth } from "@/lib/firebase";
-import {
-  listMaintenance,
-  removeMaintenance,
-  saveMaintenance,
-} from "@/lib/maintenance";
 import { modules } from "@/lib/modules";
 import { Machine, MaintenanceRecord, ModuleId } from "@/types";
 
@@ -68,10 +64,8 @@ export default function AppShell() {
   const [mobile, setMobile] = useState(false);
   const [editing, setEditing] = useState<Machine | null>(null);
   const [detail, setDetail] = useState<Machine | null>(null);
-  const [maintenance, setMaintenance] = useState<MaintenanceRecord[]>([]);
   const [editingMaintenance, setEditingMaintenance] =
     useState<MaintenanceRecord | null>(null);
-  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
   const [error, setError] = useState("");
 
   const uid = user?.uid || "demo";
@@ -92,6 +86,17 @@ export default function AppShell() {
     onError: showError,
   });
 
+  const {
+    maintenance,
+    maintenanceLoading,
+    saveMaintenance,
+    deleteMaintenance,
+  } = useMaintenance({
+    uid,
+    enabled: dataEnabled,
+    onError: showError,
+  });
+
   useEffect(() => {
     if (!auth) {
       return;
@@ -102,26 +107,6 @@ export default function AppShell() {
       setAuthReady(true);
     });
   }, []);
-
-  const refreshMaintenance = useCallback(async () => {
-    if (!dataEnabled) {
-      return;
-    }
-
-    setMaintenanceLoading(true);
-
-    try {
-      setMaintenance(await listMaintenance(uid));
-    } catch (refreshError) {
-      setError(errorMessage(refreshError));
-    } finally {
-      setMaintenanceLoading(false);
-    }
-  }, [dataEnabled, uid]);
-
-  useEffect(() => {
-    refreshMaintenance();
-  }, [refreshMaintenance]);
 
   const visible = useMemo(
     () =>
@@ -277,10 +262,9 @@ export default function AppShell() {
               }
 
               try {
-                await removeMaintenance(uid, record.id);
-                await refreshMaintenance();
-              } catch (deleteError) {
-                setError(errorMessage(deleteError));
+                await deleteMaintenance(record);
+              } catch {
+                // L'errore viene già mostrato da useMaintenance.
               }
             }}
           />
@@ -331,20 +315,11 @@ export default function AppShell() {
           busy={maintenanceLoading}
           close={() => setEditingMaintenance(null)}
           submit={async (record) => {
-            setMaintenanceLoading(true);
-
             try {
-              await saveMaintenance(uid, {
-                ...record,
-                updatedAt: new Date().toISOString(),
-              });
-
-              await refreshMaintenance();
+              await saveMaintenance(record);
               setEditingMaintenance(null);
-            } catch (saveError) {
-              setError(errorMessage(saveError));
-            } finally {
-              setMaintenanceLoading(false);
+            } catch {
+              // L'errore viene già mostrato da useMaintenance.
             }
           }}
         />
