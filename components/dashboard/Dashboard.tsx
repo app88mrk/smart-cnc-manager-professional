@@ -2,6 +2,10 @@
 
 import Kpi from "@/components/dashboard/Kpi";
 import {
+  isLifeExpired,
+  isLowStock,
+} from "@/lib/tools";
+import {
   Machine,
   MaintenanceRecord,
   ModuleId,
@@ -28,6 +32,12 @@ export default function Dashboard({
       record.status !== "Completata" &&
       record.scheduledDate &&
       record.scheduledDate < today
+  ).length;
+  const tools = records.filter(
+    (record) => record.module === "tools"
+  );
+  const toolAlerts = tools.filter(
+    (record) => isLowStock(record) || isLifeExpired(record)
   ).length;
 
   return (
@@ -76,6 +86,18 @@ export default function Dashboard({
           value={records.length}
           icon="▤"
         />
+
+        <Kpi
+          label="Utensili"
+          value={tools.length}
+          icon="⚙"
+        />
+
+        <Kpi
+          label="Avvisi utensili"
+          value={toolAlerts}
+          icon="⚠"
+        />
       </section>
 
       <section className="panel dashboardPanel">
@@ -89,7 +111,11 @@ export default function Dashboard({
           <button onClick={() => go("tools")}>
             <span>⚙</span>
             <b>Utensili</b>
-            <small>Parametri e disponibilità</small>
+            <small>
+              {toolAlerts
+                ? `${toolAlerts} avvisi da controllare`
+                : "Scorte e durata sotto controllo"}
+            </small>
           </button>
           <button onClick={() => go("jobs")}>
             <span>◫</span>

@@ -3,7 +3,7 @@
 Applicazione professionale per organizzare dati, documentazione e attività di
 un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-Versione corrente: **2.0.0**.
+Versione corrente: **2.1.0**.
 
 ## Moduli disponibili
 
@@ -11,7 +11,13 @@ Versione corrente: **2.0.0**.
 - Macchine con schede tecniche, foto e documenti.
 - Manutenzioni preventive, correttive, guasti e ispezioni.
 - Manuali con allegati.
-- Utensili.
+- Utensili professionali con:
+  - codice, categoria, produttore e specifiche geometriche;
+  - materiale, rivestimento, attacco e macchina collegata;
+  - quantità disponibile, scorta minima, posizione e fornitore;
+  - costo unitario, vita prevista, ore utilizzate e ultimo utilizzo;
+  - filtri per categoria, stato e priorità;
+  - avvisi automatici per scorta bassa e vita esaurita.
 - Lavorazioni.
 - Storico allarmi.
 - Knowledge Base.
@@ -20,6 +26,9 @@ Versione corrente: **2.0.0**.
 
 Ogni scheda dei moduli professionali può essere collegata a una macchina,
 ricercata, modificata ed eliminata.
+
+Le schede utensile create nelle versioni precedenti restano compatibili e
+vengono completate con i nuovi campi alla prima modifica.
 
 ## Sicurezza
 

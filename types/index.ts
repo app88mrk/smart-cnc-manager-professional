@@ -2,6 +2,35 @@ export type ModuleId = "dashboard" | "machines" | "manuals" | "tools" | "jobs" |
 export type RecordModuleId = Exclude<ModuleId, "dashboard" | "machines" | "maintenance">;
 export type ModuleState = "active" | "config" | "standby";
 export interface ModuleDefinition { id: ModuleId; label: string; description: string; icon: string; state: ModuleState; }
+export type ToolCategory =
+  | "Fresa"
+  | "Punta"
+  | "Maschio"
+  | "Bareno"
+  | "Tornitura"
+  | "Inserto"
+  | "Portautensile"
+  | "Altro";
+export interface ToolDetails {
+  code: string;
+  category: ToolCategory;
+  manufacturer: string;
+  material: string;
+  coating: string;
+  diameter: string;
+  cuttingLength: string;
+  totalLength: string;
+  fluteCount: string;
+  holder: string;
+  location: string;
+  supplier: string;
+  unitCost: string;
+  quantity: string;
+  minStock: string;
+  lifeHours: string;
+  usedHours: string;
+  lastUsedAt: string;
+}
 export interface RecordItem {
   id: string;
   module: RecordModuleId;
@@ -18,6 +47,7 @@ export interface RecordItem {
   filePath?: string;
   fileType?: string;
   fileSize?: number;
+  tool?: ToolDetails;
 }
 
 export interface Machine {

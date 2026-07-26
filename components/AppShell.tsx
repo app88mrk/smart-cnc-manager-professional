@@ -16,6 +16,8 @@ import MaintenanceForm from "@/components/maintenance/MaintenanceForm";
 import MaintenancePage from "@/components/maintenance/MaintenancePage";
 import RecordForm from "@/components/records/RecordForm";
 import RecordsPage from "@/components/records/RecordsPage";
+import ToolForm from "@/components/tools/ToolForm";
+import ToolsPage from "@/components/tools/ToolsPage";
 
 import useAuth from "@/hooks/useAuth";
 import useBackup from "@/hooks/useBackup";
@@ -155,8 +157,7 @@ export default function AppShell() {
       records.filter(
         (record) =>
           record.module === active &&
-          Object.values(record)
-            .join(" ")
+          JSON.stringify(record)
             .toLowerCase()
             .includes(queryText.toLowerCase())
       ),
@@ -189,7 +190,9 @@ export default function AppShell() {
         const record = pendingDelete.item;
         await deleteRecord(record);
         showSuccess(
-          `Scheda “${record.title}” eliminata correttamente.`
+          record.module === "tools"
+            ? `Utensile “${record.title}” eliminato correttamente.`
+            : `Scheda “${record.title}” eliminata correttamente.`
         );
       }
 
@@ -358,6 +361,22 @@ export default function AppShell() {
             }
             loading={maintenanceLoading}
           />
+        ) : active === "tools" ? (
+          <ToolsPage
+            records={visibleRecords}
+            machines={machines}
+            loading={recordsLoading}
+            openNew={() =>
+              setEditingRecord(createEmptyRecord("tools"))
+            }
+            openEdit={setEditingRecord}
+            onDelete={(record) =>
+              setPendingDelete({
+                kind: "record",
+                item: record,
+              })
+            }
+          />
         ) : isRecordModuleId(active) ? (
           <RecordsPage
             moduleId={active}
@@ -439,7 +458,28 @@ export default function AppShell() {
         />
       )}
 
-      {editingRecord && (
+      {editingRecord?.module === "tools" ? (
+        <ToolForm
+          record={editingRecord}
+          machines={machines}
+          busy={recordsLoading}
+          close={() => setEditingRecord(null)}
+          submit={async (record) => {
+            try {
+              await saveRecord({
+                record,
+                attachment: null,
+              });
+              setEditingRecord(null);
+              showSuccess(
+                `Utensile “${record.title}” salvato correttamente.`
+              );
+            } catch {
+              // L'errore viene già mostrato da useRecords.
+            }
+          }}
+        />
+      ) : editingRecord ? (
         <RecordForm
           record={editingRecord}
           machines={machines}
@@ -457,7 +497,7 @@ export default function AppShell() {
             }
           }}
         />
-      )}
+      ) : null}
 
       {pendingDelete && (
         <ConfirmDialog
@@ -466,14 +506,18 @@ export default function AppShell() {
               ? "Eliminare la macchina?"
               : pendingDelete.kind === "maintenance"
                 ? "Eliminare l’intervento?"
-                : "Eliminare la scheda?"
+                : pendingDelete.item.module === "tools"
+                  ? "Eliminare l’utensile?"
+                  : "Eliminare la scheda?"
           }
           message={
             pendingDelete.kind === "machine"
               ? `${pendingDelete.item.brand} ${pendingDelete.item.model} e i relativi dati verranno eliminati definitivamente.`
               : pendingDelete.kind === "maintenance"
                 ? `L’intervento “${pendingDelete.item.title}” verrà eliminato definitivamente.`
-                : `La scheda “${pendingDelete.item.title}” e il relativo allegato verranno eliminati definitivamente.`
+                : pendingDelete.item.module === "tools"
+                  ? `L’utensile “${pendingDelete.item.title}” verrà eliminato definitivamente.`
+                  : `La scheda “${pendingDelete.item.title}” e il relativo allegato verranno eliminati definitivamente.`
           }
           busy={
             pendingDelete.kind === "machine"

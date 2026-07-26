@@ -1,4 +1,5 @@
 import { recordModuleConfigs } from "@/lib/moduleConfigs";
+import { createEmptyToolDetails } from "@/lib/tools";
 import {
   Machine,
   MaintenanceRecord,
@@ -28,6 +29,7 @@ export function createEmptyMachine(): Machine {
     createdAt: timestamp,
     updatedAt: timestamp,
   };
+
 }
 
 export function createEmptyMaintenance(
@@ -59,7 +61,7 @@ export function createEmptyRecord(
   const timestamp = new Date().toISOString();
   const config = recordModuleConfigs[moduleId];
 
-  return {
+  const record: RecordItem = {
     id: crypto.randomUUID(),
     module: moduleId,
     title: "",
@@ -71,4 +73,10 @@ export function createEmptyRecord(
     createdAt: timestamp,
     updatedAt: timestamp,
   };
+
+  if (moduleId === "tools") {
+    record.tool = createEmptyToolDetails();
+  }
+
+  return record;
 }
