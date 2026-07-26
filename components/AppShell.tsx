@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { useCallback, useMemo, useState } from "react";
 import { LogOut, Menu, Search, X } from "lucide-react";
 
 import AuthScreen from "@/components/auth/AuthScreen";
@@ -13,9 +12,10 @@ import MachinesPage from "@/components/machines/MachinesPage";
 import MaintenanceForm from "@/components/maintenance/MaintenanceForm";
 import MaintenancePage from "@/components/maintenance/MaintenancePage";
 
+import useAuth from "@/hooks/useAuth";
 import useMachines from "@/hooks/useMachines";
 import useMaintenance from "@/hooks/useMaintenance";
-import { firebaseConfigured, auth } from "@/lib/firebase";
+import { firebaseConfigured } from "@/lib/firebase";
 import { modules } from "@/lib/modules";
 import { Machine, MaintenanceRecord, ModuleId } from "@/types";
 
@@ -57,8 +57,6 @@ const emptyMachine = (): Machine => ({
 });
 
 export default function AppShell() {
-  const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(!firebaseConfigured);
   const [active, setActive] = useState<ModuleId>("dashboard");
   const [queryText, setQueryText] = useState("");
   const [mobile, setMobile] = useState(false);
@@ -68,12 +66,21 @@ export default function AppShell() {
     useState<MaintenanceRecord | null>(null);
   const [error, setError] = useState("");
 
-  const uid = user?.uid || "demo";
-  const dataEnabled = authReady && (!firebaseConfigured || Boolean(user));
-
   const showError = useCallback((message: string) => {
     setError(message);
   }, []);
+
+  const {
+    user,
+    authReady,
+    logout,
+  } = useAuth({
+    onError: showError,
+  });
+
+  const uid = user?.uid || "demo";
+  const dataEnabled =
+    authReady && (!firebaseConfigured || Boolean(user));
 
   const {
     machines,
@@ -96,17 +103,6 @@ export default function AppShell() {
     enabled: dataEnabled,
     onError: showError,
   });
-
-  useEffect(() => {
-    if (!auth) {
-      return;
-    }
-
-    return onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthReady(true);
-    });
-  }, []);
 
   const visible = useMemo(
     () =>
@@ -182,7 +178,7 @@ export default function AppShell() {
         {user && (
           <button
             className="logout"
-            onClick={() => auth && signOut(auth)}
+            onClick={logout}
             title="Esci"
           >
             <LogOut size={18} />
