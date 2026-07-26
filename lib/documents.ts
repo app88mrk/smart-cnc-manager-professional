@@ -59,3 +59,63 @@ export async function removeMachineDocument(uid: string, document: MachineDocume
     writeLocal(uid, document.machineId, readLocal(uid, document.machineId).filter(item => item.id !== document.id));
   }
 }
+
+export async function replaceMachineDocuments(
+  uid: string,
+  machineIds: string[],
+  documents: MachineDocument[]
+): Promise<void> {
+  if (!db) {
+    for (const machineId of machineIds) {
+      writeLocal(
+        uid,
+        machineId,
+        documents.filter(
+          (item) => item.machineId === machineId
+        )
+      );
+    }
+    return;
+  }
+
+  const firestore = db;
+
+  for (const machineId of machineIds) {
+    const incoming = documents.filter(
+      (item) => item.machineId === machineId
+    );
+    const incomingIds = new Set(
+      incoming.map((item) => item.id)
+    );
+    const snapshot = await getDocs(
+      collection(
+        firestore,
+        "users",
+        uid,
+        "machines",
+        machineId,
+        "documents"
+      )
+    );
+
+    await Promise.all([
+      ...snapshot.docs
+        .filter((item) => !incomingIds.has(item.id))
+        .map((item) => deleteDoc(item.ref)),
+      ...incoming.map((item) =>
+        setDoc(
+          doc(
+            firestore,
+            "users",
+            uid,
+            "machines",
+            machineId,
+            "documents",
+            item.id
+          ),
+          item
+        )
+      ),
+    ]);
+  }
+}

@@ -1,40 +1,81 @@
 # Smart CNC Manager — Professional Edition
 
-Base professionale sviluppata con Next.js, React, TypeScript e Firebase.
+Applicazione professionale per organizzare dati, documentazione e attività di
+un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-## Funzioni già incluse
-- Dashboard professionale responsive
-- Macchine, manuali, utensili, lavorazioni, allarmi, manutenzioni e Knowledge Base
-- Programmi CNC e materiali predisposti
-- Ricerca globale
-- Inserimento ed eliminazione elementi
-- Allegati predisposti
-- Backup e ripristino JSON
-- Modalità demo locale
-- Firebase Authentication, Firestore e Storage predisposti
-- Regole Firestore e Storage per dati isolati per utente
+Versione corrente: **2.0.0**.
 
-## Avvio
+## Moduli disponibili
+
+- Dashboard operativa e responsive.
+- Macchine con schede tecniche, foto e documenti.
+- Manutenzioni preventive, correttive, guasti e ispezioni.
+- Manuali con allegati.
+- Utensili.
+- Lavorazioni.
+- Storico allarmi.
+- Knowledge Base.
+- Programmi CNC con allegati.
+- Materiali.
+
+Ogni scheda dei moduli professionali può essere collegata a una macchina,
+ricercata, modificata ed eliminata.
+
+## Sicurezza
+
+- Accesso tramite Firebase Authentication.
+- Registrazione pubblica disabilitata.
+- Accesso applicativo limitato all'utente autorizzato.
+- Regole Firestore e Storage limitate allo stesso utente.
+- Limite massimo degli allegati: 100 MB.
+
+## Backup e ripristino
+
+Il menu laterale permette di scaricare e ripristinare un backup JSON.
+
+Il backup comprende:
+
+- macchine;
+- manutenzioni;
+- schede di tutti i moduli professionali;
+- metadati dei documenti macchina;
+- riferimenti a foto e allegati conservati in Firebase Storage.
+
+I file binari restano in Firebase Storage e non vengono duplicati nel JSON.
+Prima del ripristino viene sempre richiesta una conferma.
+
+## Avvio locale
+
 ```bash
 npm install
 npm run dev
 ```
-Apri http://localhost:3000
+
+Apri `http://localhost:3000`.
+
+Senza configurazione Firebase l'applicazione usa la modalità demo nel browser.
 
 ## Configurazione Firebase
-1. Crea un progetto Firebase.
-2. Attiva Authentication con Email/Password.
-3. Crea Firestore.
-4. Attiva Storage.
-5. Copia `.env.example` in `.env.local` e inserisci i valori Firebase.
-6. Pubblica `firestore.rules` e `storage.rules` dalla console Firebase.
 
-## Pubblicazione su Vercel
-Importa il repository in Vercel oppure esegui `vercel` dalla cartella del progetto. Aggiungi in Vercel le stesse variabili presenti in `.env.local`.
+1. Attiva Authentication con Email/Password.
+2. Crea Firestore.
+3. Attiva Storage.
+4. Copia `.env.example` in `.env.local` e inserisci i valori Firebase.
+5. Pubblica `firestore.rules` e `storage.rules`.
 
-## Stato corrente
-L'interfaccia funziona subito con dati locali. Il prossimo passaggio è sostituire il repository locale con il repository Firestore e attivare login e upload reali su Cloud Storage.
+## Verifica
 
-## Versione 1.3 - Manuali e allegati
+```bash
+npm run build
+```
 
-La scheda macchina include ora una sezione per caricare, aprire, scaricare ed eliminare documenti tecnici. I metadati sono salvati in Firestore e i file in Firebase Storage, con un limite massimo di 100 MB per file.
+La build controlla compilazione Next.js e validità TypeScript.
+
+## Pubblicazione
+
+Il branch di sviluppo è `develop`; `main` è riservato alle versioni stabili.
+
+```bash
+git push origin develop
+vercel --prod
+```

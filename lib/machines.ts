@@ -50,3 +50,31 @@ export async function removeMachine(uid: string, machine: Machine): Promise<void
   if (db) await deleteDoc(doc(db, "users", uid, "machines", machine.id));
   else writeLocal(uid, readLocal(uid).filter(item => item.id !== machine.id));
 }
+
+export async function replaceMachines(
+  uid: string,
+  machines: Machine[]
+): Promise<void> {
+  if (!db) {
+    writeLocal(uid, machines);
+    return;
+  }
+
+  const firestore = db;
+  const snapshot = await getDocs(
+    collection(firestore, "users", uid, "machines")
+  );
+  const incomingIds = new Set(machines.map((item) => item.id));
+
+  await Promise.all([
+    ...snapshot.docs
+      .filter((item) => !incomingIds.has(item.id))
+      .map((item) => deleteDoc(item.ref)),
+    ...machines.map((machine) =>
+      setDoc(
+        doc(firestore, "users", uid, "machines", machine.id),
+        machine
+      )
+    ),
+  ]);
+}

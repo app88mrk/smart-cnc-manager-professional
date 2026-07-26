@@ -8,6 +8,6 @@ export const modules: ModuleDefinition[] = [
   { id:"alarms", label:"Allarmi", description:"Cause, soluzioni e storico", icon:"⚠", state:"active" },
   { id:"maintenance", label:"Manutenzioni", description:"Scadenze, ricambi e interventi", icon:"◆", state:"active" },
   { id:"notes", label:"Knowledge Base", description:"Procedure, idee e checklist", icon:"✎", state:"active" },
-  { id:"programs", label:"Programmi CNC", description:"G-code e revisioni", icon:"⌘", state:"config" },
-  { id:"materials", label:"Materiali", description:"Schede e parametri di taglio", icon:"⬡", state:"config" }
+  { id:"programs", label:"Programmi CNC", description:"G-code e revisioni", icon:"⌘", state:"active" },
+  { id:"materials", label:"Materiali", description:"Schede e parametri di taglio", icon:"⬡", state:"active" }
 ];

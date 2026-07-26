@@ -1,17 +1,24 @@
 "use client";
 
 import Kpi from "@/components/dashboard/Kpi";
-import { Machine, MaintenanceRecord, ModuleId } from "@/types";
+import {
+  Machine,
+  MaintenanceRecord,
+  ModuleId,
+  RecordItem,
+} from "@/types";
 
 interface DashboardProps {
   machines: Machine[];
   maintenance: MaintenanceRecord[];
+  records: RecordItem[];
   go: (id: ModuleId) => void;
 }
 
 export default function Dashboard({
   machines,
   maintenance,
+  records,
   go,
 }: DashboardProps) {
   const today = new Date().toISOString().slice(0, 10);
@@ -63,6 +70,48 @@ export default function Dashboard({
         />
 
         <Kpi label="Scadute" value={overdue} icon="⚠" />
+
+        <Kpi
+          label="Schede operative"
+          value={records.length}
+          icon="▤"
+        />
+      </section>
+
+      <section className="panel dashboardPanel">
+        <h2>Accesso rapido</h2>
+        <div className="quick">
+          <button onClick={() => go("manuals")}>
+            <span>▤</span>
+            <b>Manuali</b>
+            <small>Documenti e revisioni</small>
+          </button>
+          <button onClick={() => go("tools")}>
+            <span>⚙</span>
+            <b>Utensili</b>
+            <small>Parametri e disponibilità</small>
+          </button>
+          <button onClick={() => go("jobs")}>
+            <span>◫</span>
+            <b>Lavorazioni</b>
+            <small>Commesse e cicli</small>
+          </button>
+          <button onClick={() => go("alarms")}>
+            <span>⚠</span>
+            <b>Allarmi</b>
+            <small>Cause e soluzioni</small>
+          </button>
+          <button onClick={() => go("programs")}>
+            <span>⌘</span>
+            <b>Programmi CNC</b>
+            <small>G-code e revisioni</small>
+          </button>
+          <button onClick={() => go("materials")}>
+            <span>⬡</span>
+            <b>Materiali</b>
+            <small>Schede e parametri</small>
+          </button>
+        </div>
       </section>
 
       <section className="panel dashboardPanel">

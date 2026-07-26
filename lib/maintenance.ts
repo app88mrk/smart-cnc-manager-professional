@@ -25,3 +25,37 @@ export async function removeMaintenance(uid: string, id: string): Promise<void> 
   if (db) await deleteDoc(doc(db, "users", uid, "maintenance", id));
   else writeLocal(uid, readLocal(uid).filter(x => x.id !== id));
 }
+
+export async function replaceMaintenance(
+  uid: string,
+  records: MaintenanceRecord[]
+): Promise<void> {
+  if (!db) {
+    writeLocal(uid, records);
+    return;
+  }
+
+  const firestore = db;
+  const snapshot = await getDocs(
+    collection(firestore, "users", uid, "maintenance")
+  );
+  const incomingIds = new Set(records.map((item) => item.id));
+
+  await Promise.all([
+    ...snapshot.docs
+      .filter((item) => !incomingIds.has(item.id))
+      .map((item) => deleteDoc(item.ref)),
+    ...records.map((record) =>
+      setDoc(
+        doc(
+          firestore,
+          "users",
+          uid,
+          "maintenance",
+          record.id
+        ),
+        record
+      )
+    ),
+  ]);
+}

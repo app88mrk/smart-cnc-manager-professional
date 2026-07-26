@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { LogOut, Menu, Search } from "lucide-react";
 
 import AuthScreen from "@/components/auth/AuthScreen";
+import BackupControls from "@/components/common/BackupControls";
 import ComingSoon from "@/components/common/ComingSoon";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import FeedbackBanner from "@/components/common/FeedbackBanner";
@@ -13,67 +14,58 @@ import MachineForm from "@/components/machines/MachineForm";
 import MachinesPage from "@/components/machines/MachinesPage";
 import MaintenanceForm from "@/components/maintenance/MaintenanceForm";
 import MaintenancePage from "@/components/maintenance/MaintenancePage";
+import RecordForm from "@/components/records/RecordForm";
+import RecordsPage from "@/components/records/RecordsPage";
 
 import useAuth from "@/hooks/useAuth";
+import useBackup from "@/hooks/useBackup";
 import useFeedback from "@/hooks/useFeedback";
 import useMachines from "@/hooks/useMachines";
 import useMaintenance from "@/hooks/useMaintenance";
+import useRecords from "@/hooks/useRecords";
+import useWorkspace from "@/hooks/useWorkspace";
+import {
+  createEmptyMachine,
+  createEmptyMaintenance,
+  createEmptyRecord,
+} from "@/lib/factories";
 import { firebaseConfigured } from "@/lib/firebase";
+import { isRecordModuleId } from "@/lib/moduleConfigs";
 import { modules } from "@/lib/modules";
-import { Machine, MaintenanceRecord, ModuleId } from "@/types";
+import {
+  Machine,
+  MaintenanceRecord,
+  RecordItem,
+} from "@/types";
 
 type PendingDelete =
   | { kind: "machine"; item: Machine }
   | { kind: "maintenance"; item: MaintenanceRecord }
+  | { kind: "record"; item: RecordItem }
   | null;
 
-const emptyMaintenance = (machineId = ""): MaintenanceRecord => ({
-  id: crypto.randomUUID(),
-  machineId,
-  type: "Preventiva",
-  status: "Pianificata",
-  title: "",
-  description: "",
-  technician: "",
-  scheduledDate: new Date().toISOString().slice(0, 10),
-  completedDate: "",
-  hours: "",
-  cost: "",
-  parts: "",
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-});
-
-const emptyMachine = (): Machine => ({
-  id: crypto.randomUUID(),
-  brand: "",
-  model: "",
-  serialNumber: "",
-  year: "",
-  cncControl: "",
-  travelX: "",
-  travelY: "",
-  travelZ: "",
-  spindle: "",
-  toolTaper: "",
-  toolMagazine: "",
-  department: "",
-  status: "Operativa",
-  notes: "",
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-});
-
 export default function AppShell() {
-  const [active, setActive] = useState<ModuleId>("dashboard");
-  const [queryText, setQueryText] = useState("");
-  const [mobile, setMobile] = useState(false);
-  const [editing, setEditing] = useState<Machine | null>(null);
-  const [detail, setDetail] = useState<Machine | null>(null);
-  const [editingMaintenance, setEditingMaintenance] =
-    useState<MaintenanceRecord | null>(null);
+  const {
+    active,
+    queryText,
+    mobileOpen,
+    editingMachine,
+    machineDetail,
+    editingMaintenance,
+    editingRecord,
+    setQueryText,
+    openModule,
+    toggleMobile,
+    setEditingMachine,
+    setMachineDetail,
+    setEditingMaintenance,
+    setEditingRecord,
+    closeAllEditors,
+  } = useWorkspace();
   const [pendingDelete, setPendingDelete] =
     useState<PendingDelete>(null);
+  const [restoreFile, setRestoreFile] =
+    useState<File | null>(null);
 
   const {
     feedback,
@@ -98,6 +90,7 @@ export default function AppShell() {
   const {
     machines,
     machinesLoading,
+    refreshMachines,
     saveMachine,
     deleteMachine,
   } = useMachines({
@@ -109,6 +102,7 @@ export default function AppShell() {
   const {
     maintenance,
     maintenanceLoading,
+    refreshMaintenance,
     saveMaintenance,
     deleteMaintenance,
   } = useMaintenance({
@@ -117,7 +111,35 @@ export default function AppShell() {
     onError: showError,
   });
 
-  const visible = useMemo(
+  const {
+    records,
+    recordsLoading,
+    refreshRecords,
+    saveRecord,
+    deleteRecord,
+  } = useRecords({
+    uid,
+    enabled: dataEnabled,
+    onError: showError,
+  });
+
+  const {
+    backupBusy,
+    exportBackup,
+    importBackup,
+  } = useBackup({
+    uid,
+    machines,
+    maintenance,
+    records,
+    refreshMachines,
+    refreshMaintenance,
+    refreshRecords,
+    onError: showError,
+    onSuccess: showSuccess,
+  });
+
+  const visibleMachines = useMemo(
     () =>
       machines.filter((machine) =>
         Object.values(machine)
@@ -126,6 +148,19 @@ export default function AppShell() {
           .includes(queryText.toLowerCase())
       ),
     [machines, queryText]
+  );
+
+  const visibleRecords = useMemo(
+    () =>
+      records.filter(
+        (record) =>
+          record.module === active &&
+          Object.values(record)
+            .join(" ")
+            .toLowerCase()
+            .includes(queryText.toLowerCase())
+      ),
+    [active, queryText, records]
   );
 
   async function confirmDelete() {
@@ -137,14 +172,24 @@ export default function AppShell() {
       if (pendingDelete.kind === "machine") {
         const machine = pendingDelete.item;
         await deleteMachine(machine);
+        await Promise.all([
+          refreshMaintenance(),
+          refreshRecords(),
+        ]);
         showSuccess(
           `${machine.brand} ${machine.model} eliminata correttamente.`
         );
-      } else {
+      } else if (pendingDelete.kind === "maintenance") {
         const record = pendingDelete.item;
         await deleteMaintenance(record);
         showSuccess(
           `Intervento “${record.title}” eliminato correttamente.`
+        );
+      } else {
+        const record = pendingDelete.item;
+        await deleteRecord(record);
+        showSuccess(
+          `Scheda “${record.title}” eliminata correttamente.`
         );
       }
 
@@ -152,6 +197,21 @@ export default function AppShell() {
     } catch {
       setPendingDelete(null);
       // L'errore viene già mostrato dall'hook interessato.
+    }
+  }
+
+  async function confirmRestore() {
+    if (!restoreFile) {
+      return;
+    }
+
+    try {
+      await importBackup(restoreFile);
+      closeAllEditors();
+      setRestoreFile(null);
+    } catch {
+      setRestoreFile(null);
+      // L'errore viene già mostrato da useBackup.
     }
   }
 
@@ -175,7 +235,8 @@ export default function AppShell() {
       <header>
         <button
           className="mobileMenu"
-          onClick={() => setMobile(!mobile)}
+          onClick={toggleMobile}
+          aria-label="Apri menu"
         >
           <Menu />
         </button>
@@ -193,7 +254,7 @@ export default function AppShell() {
           <input
             value={queryText}
             onChange={(event) => setQueryText(event.target.value)}
-            placeholder="Cerca macchina, matricola, controllo…"
+            placeholder="Cerca nel modulo corrente…"
           />
         </div>
 
@@ -219,16 +280,13 @@ export default function AppShell() {
         )}
       </header>
 
-      <aside className={mobile ? "show" : ""}>
+      <aside className={mobileOpen ? "show" : ""}>
         <nav>
           {modules.map((module) => (
             <button
               key={module.id}
               className={active === module.id ? "active" : ""}
-              onClick={() => {
-                setActive(module.id);
-                setMobile(false);
-              }}
+              onClick={() => openModule(module.id)}
             >
               <span>{module.icon}</span>
 
@@ -247,6 +305,12 @@ export default function AppShell() {
             </button>
           ))}
         </nav>
+
+        <BackupControls
+          busy={backupBusy}
+          exportBackup={exportBackup}
+          selectBackup={setRestoreFile}
+        />
       </aside>
 
       <main>
@@ -262,14 +326,17 @@ export default function AppShell() {
           <Dashboard
             machines={machines}
             maintenance={maintenance}
-            go={setActive}
+            records={records}
+            go={openModule}
           />
         ) : active === "machines" ? (
           <MachinesPage
-            machines={visible}
-            openNew={() => setEditing(emptyMachine())}
-            openEdit={setEditing}
-            openDetail={setDetail}
+            machines={visibleMachines}
+            openNew={() =>
+              setEditingMachine(createEmptyMachine())
+            }
+            openEdit={setEditingMachine}
+            openDetail={setMachineDetail}
             onDelete={(machine) =>
               setPendingDelete({ kind: "machine", item: machine })
             }
@@ -280,7 +347,7 @@ export default function AppShell() {
             records={maintenance}
             machines={machines}
             openNew={() =>
-              setEditingMaintenance(emptyMaintenance())
+              setEditingMaintenance(createEmptyMaintenance())
             }
             openEdit={setEditingMaintenance}
             onDelete={(record) =>
@@ -291,20 +358,37 @@ export default function AppShell() {
             }
             loading={maintenanceLoading}
           />
+        ) : isRecordModuleId(active) ? (
+          <RecordsPage
+            moduleId={active}
+            records={visibleRecords}
+            machines={machines}
+            loading={recordsLoading}
+            openNew={() =>
+              setEditingRecord(createEmptyRecord(active))
+            }
+            openEdit={setEditingRecord}
+            onDelete={(record) =>
+              setPendingDelete({
+                kind: "record",
+                item: record,
+              })
+            }
+          />
         ) : (
           <ComingSoon active={active} />
         )}
       </main>
 
-      {editing && (
+      {editingMachine && (
         <MachineForm
-          machine={editing}
+          machine={editingMachine}
           busy={machinesLoading}
-          close={() => setEditing(null)}
+          close={() => setEditingMachine(null)}
           submit={async (machine, photo) => {
             try {
               await saveMachine({ machine, photo });
-              setEditing(null);
+              setEditingMachine(null);
               showSuccess(
                 `${machine.brand} ${machine.model} salvata correttamente.`
               );
@@ -315,20 +399,22 @@ export default function AppShell() {
         />
       )}
 
-      {detail && (
+      {machineDetail && (
         <MachineDetail
           uid={uid}
-          machine={detail}
+          machine={machineDetail}
           maintenance={maintenance.filter(
-            (record) => record.machineId === detail.id
+            (record) => record.machineId === machineDetail.id
           )}
-          close={() => setDetail(null)}
+          close={() => setMachineDetail(null)}
           edit={() => {
-            setEditing(detail);
-            setDetail(null);
+            setEditingMachine(machineDetail);
+            setMachineDetail(null);
           }}
           addMaintenance={() =>
-            setEditingMaintenance(emptyMaintenance(detail.id))
+            setEditingMaintenance(
+              createEmptyMaintenance(machineDetail.id)
+            )
           }
         />
       )}
@@ -353,25 +439,62 @@ export default function AppShell() {
         />
       )}
 
+      {editingRecord && (
+        <RecordForm
+          record={editingRecord}
+          machines={machines}
+          busy={recordsLoading}
+          close={() => setEditingRecord(null)}
+          submit={async (record, attachment) => {
+            try {
+              await saveRecord({ record, attachment });
+              setEditingRecord(null);
+              showSuccess(
+                `Scheda “${record.title}” salvata correttamente.`
+              );
+            } catch {
+              // L'errore viene già mostrato da useRecords.
+            }
+          }}
+        />
+      )}
+
       {pendingDelete && (
         <ConfirmDialog
           title={
             pendingDelete.kind === "machine"
               ? "Eliminare la macchina?"
-              : "Eliminare l’intervento?"
+              : pendingDelete.kind === "maintenance"
+                ? "Eliminare l’intervento?"
+                : "Eliminare la scheda?"
           }
           message={
             pendingDelete.kind === "machine"
               ? `${pendingDelete.item.brand} ${pendingDelete.item.model} e i relativi dati verranno eliminati definitivamente.`
-              : `L’intervento “${pendingDelete.item.title}” verrà eliminato definitivamente.`
+              : pendingDelete.kind === "maintenance"
+                ? `L’intervento “${pendingDelete.item.title}” verrà eliminato definitivamente.`
+                : `La scheda “${pendingDelete.item.title}” e il relativo allegato verranno eliminati definitivamente.`
           }
           busy={
             pendingDelete.kind === "machine"
               ? machinesLoading
-              : maintenanceLoading
+              : pendingDelete.kind === "maintenance"
+                ? maintenanceLoading
+                : recordsLoading
           }
           cancel={() => setPendingDelete(null)}
           confirm={confirmDelete}
+        />
+      )}
+
+      {restoreFile && (
+        <ConfirmDialog
+          title="Ripristinare il backup?"
+          message={`Il file “${restoreFile.name}” sostituirà le schede attuali. Gli allegati già presenti in Storage non verranno cancellati.`}
+          busy={backupBusy}
+          confirmLabel="Ripristina"
+          cancel={() => setRestoreFile(null)}
+          confirm={confirmRestore}
         />
       )}
     </div>

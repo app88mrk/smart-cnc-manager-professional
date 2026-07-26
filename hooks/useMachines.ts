@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   listMachines,
-  removeMachine,
   saveMachine as persistMachine,
 } from "@/lib/machines";
+import { removeMachineCascade } from "@/lib/machineCascade";
 import { Machine } from "@/types";
 
 type UseMachinesOptions = {
@@ -80,7 +80,7 @@ export default function useMachines({
       setMachinesLoading(true);
 
       try {
-        await removeMachine(uid, machine);
+        await removeMachineCascade(uid, machine);
         await refreshMachines();
       } catch (error) {
         const message = errorMessage(error);
