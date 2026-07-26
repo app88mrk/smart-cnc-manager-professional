@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { LogOut, Menu, Search } from "lucide-react";
 
 import AuthScreen from "@/components/auth/AuthScreen";
@@ -15,16 +15,12 @@ import MaintenanceForm from "@/components/maintenance/MaintenanceForm";
 import MaintenancePage from "@/components/maintenance/MaintenancePage";
 
 import useAuth from "@/hooks/useAuth";
+import useFeedback from "@/hooks/useFeedback";
 import useMachines from "@/hooks/useMachines";
 import useMaintenance from "@/hooks/useMaintenance";
 import { firebaseConfigured } from "@/lib/firebase";
 import { modules } from "@/lib/modules";
 import { Machine, MaintenanceRecord, ModuleId } from "@/types";
-
-type Feedback = {
-  type: "success" | "error";
-  message: string;
-};
 
 type PendingDelete =
   | { kind: "machine"; item: Machine }
@@ -76,30 +72,15 @@ export default function AppShell() {
   const [detail, setDetail] = useState<Machine | null>(null);
   const [editingMaintenance, setEditingMaintenance] =
     useState<MaintenanceRecord | null>(null);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [pendingDelete, setPendingDelete] =
     useState<PendingDelete>(null);
 
-  const showError = useCallback((message: string) => {
-    setFeedback({ type: "error", message });
-  }, []);
-
-  const showSuccess = useCallback((message: string) => {
-    setFeedback({ type: "success", message });
-  }, []);
-
-  useEffect(() => {
-    if (feedback?.type !== "success") {
-      return;
-    }
-
-    const timeout = window.setTimeout(
-      () => setFeedback(null),
-      4500
-    );
-
-    return () => window.clearTimeout(timeout);
-  }, [feedback]);
+  const {
+    feedback,
+    showError,
+    showSuccess,
+    clearFeedback,
+  } = useFeedback();
 
   const {
     user,
@@ -273,7 +254,7 @@ export default function AppShell() {
           <FeedbackBanner
             type={feedback.type}
             message={feedback.message}
-            close={() => setFeedback(null)}
+            close={clearFeedback}
           />
         )}
 

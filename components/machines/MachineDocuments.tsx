@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Download, ExternalLink, FileText, Trash2, Upload } from "lucide-react";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import FeedbackBanner from "@/components/common/FeedbackBanner";
+import useFeedback from "@/hooks/useFeedback";
 import useMachineDocuments from "@/hooks/useMachineDocuments";
 import { MachineDocument } from "@/types";
 
@@ -18,14 +19,12 @@ export default function MachineDocuments({
 }: MachineDocumentsProps) {
   const [pendingDelete, setPendingDelete] =
     useState<MachineDocument | null>(null);
-  const [feedback, setFeedback] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-
-  const showError = useCallback((message: string) => {
-    setFeedback({ type: "error", message });
-  }, []);
+  const {
+    feedback,
+    showError,
+    showSuccess,
+    clearFeedback,
+  } = useFeedback({ successDuration: 0 });
 
   const {
     documents,
@@ -43,32 +42,27 @@ export default function MachineDocuments({
     if (!files?.length) return;
 
     const selectedFiles = Array.from(files);
-    setFeedback(null);
+    clearFeedback();
 
     try {
       await uploadDocuments(selectedFiles);
-      setFeedback({
-        type: "success",
-        message:
-          selectedFiles.length === 1
-            ? "Documento caricato correttamente."
-            : `${selectedFiles.length} documenti caricati correttamente.`,
-      });
+      showSuccess(
+        selectedFiles.length === 1
+          ? "Documento caricato correttamente."
+          : `${selectedFiles.length} documenti caricati correttamente.`
+      );
     } catch {
       // L'errore viene mostrato da useMachineDocuments.
     }
   }
 
   async function remove(document: MachineDocument) {
-    setFeedback(null);
+    clearFeedback();
 
     try {
       await deleteDocument(document);
       setPendingDelete(null);
-      setFeedback({
-        type: "success",
-        message: "Documento eliminato correttamente.",
-      });
+      showSuccess("Documento eliminato correttamente.");
     } catch {
       setPendingDelete(null);
       // L'errore viene mostrato da useMachineDocuments.
@@ -108,7 +102,7 @@ export default function MachineDocuments({
             <FeedbackBanner
               type={feedback.type}
               message={feedback.message}
-              close={() => setFeedback(null)}
+              close={clearFeedback}
             />
           </div>
         )}
