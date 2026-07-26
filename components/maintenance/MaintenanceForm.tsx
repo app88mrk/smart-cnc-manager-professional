@@ -21,15 +21,67 @@ export default function MaintenanceForm({
   submit,
 }: MaintenanceFormProps) {
   const [form, setForm] = useState(record);
+  const [validationError, setValidationError] = useState("");
 
-  const set = (key: keyof MaintenanceRecord, value: string) =>
+  const set = (key: keyof MaintenanceRecord, value: string) => {
+    setValidationError("");
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const validate = () => {
+    if (!form.machineId) {
+      return "Seleziona la macchina interessata.";
+    }
+
+    if (!form.title.trim()) {
+      return "Inserisci il titolo dell’intervento.";
+    }
+
+    if (!form.scheduledDate) {
+      return "Inserisci la data pianificata.";
+    }
+
+    if (
+      form.completedDate &&
+      form.completedDate < form.scheduledDate
+    ) {
+      return "La data di completamento non può precedere quella pianificata.";
+    }
+
+    if (form.status === "Completata" && !form.completedDate) {
+      return "Inserisci la data di completamento dell’intervento.";
+    }
+
+    if (
+      (form.hours && Number(form.hours) < 0) ||
+      (form.cost && Number(form.cost) < 0)
+    ) {
+      return "Ore e costo non possono essere valori negativi.";
+    }
+
+    return "";
+  };
+
+  const handleSubmit = () => {
+    const message = validate();
+
+    if (message) {
+      setValidationError(message);
+      return;
+    }
+
+    submit({
+      ...form,
+      title: form.title.trim(),
+      technician: form.technician.trim(),
+    });
+  };
 
   return (
     <div className="modal">
       <form onSubmit={(event) => {
         event.preventDefault();
-        submit(form);
+        handleSubmit();
       }}>
         <div className="modalHead">
           <div>
@@ -86,9 +138,15 @@ export default function MaintenanceForm({
           </label>
         </div>
 
+        {validationError && (
+          <div className="formError" role="alert">
+            {validationError}
+          </div>
+        )}
+
         <div className="modalActions">
-          <button type="button" onClick={close}>Annulla</button>
-          <button className="primary" disabled={busy}>
+          <button type="button" onClick={close} disabled={busy}>Annulla</button>
+          <button className="primary" disabled={busy} type="submit">
             {busy ? "Salvataggio…" : "Salva intervento"}
           </button>
         </div>

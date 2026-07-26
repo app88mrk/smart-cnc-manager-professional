@@ -20,15 +20,64 @@ export default function MachineForm({
 }: MachineFormProps) {
   const [form, setForm] = useState(machine);
   const [photo, setPhoto] = useState<File | null>(null);
+  const [validationError, setValidationError] = useState("");
 
-  const set = (key: keyof Machine, value: string) =>
+  const set = (key: keyof Machine, value: string) => {
+    setValidationError("");
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const validate = () => {
+    const brand = form.brand.trim();
+    const model = form.model.trim();
+    const year = Number(form.year);
+    const maximumYear = new Date().getFullYear() + 1;
+
+    if (!brand || !model) {
+      return "Inserisci marca e modello della macchina.";
+    }
+
+    if (
+      form.year &&
+      (!Number.isInteger(year) || year < 1900 || year > maximumYear)
+    ) {
+      return `Inserisci un anno compreso tra 1900 e ${maximumYear}.`;
+    }
+
+    if (photo && !photo.type.startsWith("image/")) {
+      return "Il file selezionato deve essere un’immagine.";
+    }
+
+    if (photo && photo.size > 10 * 1024 * 1024) {
+      return "La foto non può superare 10 MB.";
+    }
+
+    return "";
+  };
+
+  const handleSubmit = () => {
+    const message = validate();
+
+    if (message) {
+      setValidationError(message);
+      return;
+    }
+
+    submit(
+      {
+        ...form,
+        brand: form.brand.trim(),
+        model: form.model.trim(),
+      },
+      photo
+    );
+  };
 
   return (
     <div className="modal">
       <form onSubmit={(event) => {
         event.preventDefault();
-        submit(form, photo);
+        handleSubmit();
       }}>
         <div className="modalHead">
           <div>
@@ -75,9 +124,15 @@ export default function MachineForm({
           </label>
         </div>
 
+        {validationError && (
+          <div className="formError" role="alert">
+            {validationError}
+          </div>
+        )}
+
         <div className="modalActions">
-          <button type="button" onClick={close}>Annulla</button>
-          <button className="primary" disabled={busy}>
+          <button type="button" onClick={close} disabled={busy}>Annulla</button>
+          <button className="primary" disabled={busy} type="submit">
             {busy ? "Salvataggio…" : "Salva macchina"}
           </button>
         </div>

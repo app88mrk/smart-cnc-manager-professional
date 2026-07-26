@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Download, ExternalLink, FileText, Trash2, Upload } from "lucide-react";
+import ConfirmDialog from "@/components/common/ConfirmDialog";
+import FeedbackBanner from "@/components/common/FeedbackBanner";
 import {
   listMachineDocuments,
   removeMachineDocument,
@@ -12,24 +14,28 @@ import { MachineDocument } from "@/types";
 interface MachineDocumentsProps {
   uid: string;
   machineId: string;
-  onError: (message: string) => void;
 }
 
 export default function MachineDocuments({
   uid,
   machineId,
-  onError,
 }: MachineDocumentsProps) {
   const [documents, setDocuments] = useState<MachineDocument[]>([]);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pendingDelete, setPendingDelete] =
+    useState<MachineDocument | null>(null);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   async function refreshDocuments() {
     setLoading(true);
     try {
       setDocuments(await listMachineDocuments(uid, machineId));
     } catch (error) {
-      onError(errorMessage(error));
+      setFeedback({ type: "error", message: errorMessage(error) });
     } finally {
       setLoading(false);
     }
@@ -42,89 +48,132 @@ export default function MachineDocuments({
   async function uploadFiles(files: FileList | null) {
     if (!files?.length) return;
 
+    const selectedFiles = Array.from(files);
     setBusy(true);
+    setFeedback(null);
+
     try {
-      for (const file of Array.from(files)) {
+      for (const file of selectedFiles) {
         await uploadMachineDocument(uid, machineId, file);
       }
       await refreshDocuments();
+      setFeedback({
+        type: "success",
+        message:
+          selectedFiles.length === 1
+            ? "Documento caricato correttamente."
+            : `${selectedFiles.length} documenti caricati correttamente.`,
+      });
     } catch (error) {
-      onError(errorMessage(error));
+      setFeedback({ type: "error", message: errorMessage(error) });
     } finally {
       setBusy(false);
     }
   }
 
   async function remove(document: MachineDocument) {
-    if (!confirm(`Eliminare ${document.name}?`)) return;
-
     setBusy(true);
+    setFeedback(null);
+
     try {
       await removeMachineDocument(uid, document);
       await refreshDocuments();
+      setPendingDelete(null);
+      setFeedback({
+        type: "success",
+        message: "Documento eliminato correttamente.",
+      });
     } catch (error) {
-      onError(errorMessage(error));
+      setPendingDelete(null);
+      setFeedback({ type: "error", message: errorMessage(error) });
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <section className="documentsBox">
-      <div className="documentsHead">
-        <div>
-          <b>Manuali e allegati</b>
-          <span>PDF, schemi, backup CNC, immagini e documenti tecnici.</span>
+    <>
+      <section className="documentsBox">
+        <div className="documentsHead">
+          <div>
+            <b>Manuali e allegati</b>
+            <span>PDF, schemi, backup CNC, immagini e documenti tecnici.</span>
+          </div>
+
+          <label className={`documentUpload ${busy ? "disabled" : ""}`}>
+            <Upload size={17} />
+            {busy ? "Caricamento…" : "Carica file"}
+            <input
+              type="file"
+              multiple
+              disabled={busy}
+              onChange={(event) => {
+                uploadFiles(event.target.files);
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
         </div>
 
-        <label className={`documentUpload ${busy ? "disabled" : ""}`}>
-          <Upload size={17} />
-          {busy ? "Caricamento…" : "Carica file"}
-          <input
-            type="file"
-            multiple
-            disabled={busy}
-            onChange={(event) => {
-              uploadFiles(event.target.files);
-              event.currentTarget.value = "";
-            }}
-          />
-        </label>
-      </div>
+        {feedback && (
+          <div className="documentFeedback">
+            <FeedbackBanner
+              type={feedback.type}
+              message={feedback.message}
+              close={() => setFeedback(null)}
+            />
+          </div>
+        )}
 
-      {loading ? (
-        <div className="documentsEmpty">Caricamento documenti…</div>
-      ) : documents.length ? (
-        <div className="documentList">
-          {documents.map((document) => (
-            <div className="documentRow" key={document.id}>
-              <span className="documentIcon"><FileText size={20} /></span>
-              <div className="documentInfo">
-                <b>{document.name}</b>
-                <span>{formatBytes(document.size)} · {formatDate(document.createdAt)}</span>
+        {loading ? (
+          <div className="documentsEmpty">Caricamento documenti…</div>
+        ) : documents.length ? (
+          <div className="documentList">
+            {documents.map((document) => (
+              <div className="documentRow" key={document.id}>
+                <span className="documentIcon"><FileText size={20} /></span>
+                <div className="documentInfo">
+                  <b>{document.name}</b>
+                  <span>{formatBytes(document.size)} · {formatDate(document.createdAt)}</span>
+                </div>
+                <div className="documentActions">
+                  <a href={document.downloadUrl} target="_blank" rel="noreferrer" title="Apri">
+                    <ExternalLink size={17} />
+                  </a>
+                  <a href={document.downloadUrl} download={document.name} title="Scarica">
+                    <Download size={17} />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDelete(document)}
+                    disabled={busy}
+                    title="Elimina"
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
               </div>
-              <div className="documentActions">
-                <a href={document.downloadUrl} target="_blank" rel="noreferrer" title="Apri">
-                  <ExternalLink size={17} />
-                </a>
-                <a href={document.downloadUrl} download={document.name} title="Scarica">
-                  <Download size={17} />
-                </a>
-                <button type="button" onClick={() => remove(document)} disabled={busy} title="Elimina">
-                  <Trash2 size={17} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="documentsEmpty">
-          <FileText size={25} />
-          <b>Nessun documento caricato</b>
-          <span>Usa “Carica file” per aggiungere il primo allegato.</span>
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="documentsEmpty">
+            <FileText size={25} />
+            <b>Nessun documento caricato</b>
+            <span>Usa “Carica file” per aggiungere il primo allegato.</span>
+          </div>
+        )}
+      </section>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Eliminare il documento?"
+          message={`“${pendingDelete.name}” verrà eliminato definitivamente.`}
+          busy={busy}
+          cancel={() => setPendingDelete(null)}
+          confirm={() => remove(pendingDelete)}
+        />
       )}
-    </section>
+    </>
   );
 }
 

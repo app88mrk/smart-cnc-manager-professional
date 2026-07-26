@@ -13,7 +13,6 @@ interface MachineDetailProps {
   close: () => void;
   edit: () => void;
   addMaintenance: () => void;
-  onError: (message: string) => void;
 }
 
 export default function MachineDetail({
@@ -23,7 +22,6 @@ export default function MachineDetail({
   close,
   edit,
   addMaintenance,
-  onError,
 }: MachineDetailProps) {
   return (
     <div className="modal">
@@ -71,7 +69,7 @@ export default function MachineDetail({
           )}
 
           <MachineMaintenance records={maintenance} add={addMaintenance} />
-          <MachineDocuments uid={uid} machineId={machine.id} onError={onError} />
+          <MachineDocuments uid={uid} machineId={machine.id} />
         </div>
       </div>
     </div>

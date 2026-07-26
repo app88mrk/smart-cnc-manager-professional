@@ -1,6 +1,13 @@
 "use client";
 
-import { CalendarDays, Pencil, Plus, Trash2, Wrench } from "lucide-react";
+import {
+  CalendarDays,
+  LoaderCircle,
+  Pencil,
+  Plus,
+  Trash2,
+  Wrench,
+} from "lucide-react";
 import { Machine, MaintenanceRecord } from "@/types";
 
 interface MaintenancePageProps {
@@ -9,6 +16,7 @@ interface MaintenancePageProps {
   openNew: () => void;
   openEdit: (record: MaintenanceRecord) => void;
   onDelete: (record: MaintenanceRecord) => void;
+  loading: boolean;
 }
 
 export default function MaintenancePage({
@@ -17,6 +25,7 @@ export default function MaintenancePage({
   openNew,
   openEdit,
   onDelete,
+  loading,
 }: MaintenancePageProps) {
   const machineName = (id: string) => {
     const machine = machines.find((item) => item.id === id);
@@ -35,6 +44,13 @@ export default function MaintenancePage({
           <Plus size={18} /> Nuovo intervento
         </button>
       </div>
+
+      {loading && (
+        <div className="inlineLoading" role="status">
+          <LoaderCircle className="spinner" size={18} />
+          Aggiornamento manutenzioni…
+        </div>
+      )}
 
       <section className="maintenanceGrid">
         {records.length ? (

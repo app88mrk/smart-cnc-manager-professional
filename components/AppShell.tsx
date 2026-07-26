@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { LogOut, Menu, Search, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { LogOut, Menu, Search } from "lucide-react";
 
 import AuthScreen from "@/components/auth/AuthScreen";
 import ComingSoon from "@/components/common/ComingSoon";
+import ConfirmDialog from "@/components/common/ConfirmDialog";
+import FeedbackBanner from "@/components/common/FeedbackBanner";
 import Dashboard from "@/components/dashboard/Dashboard";
 import MachineDetail from "@/components/machines/MachineDetail";
 import MachineForm from "@/components/machines/MachineForm";
@@ -18,6 +20,16 @@ import useMaintenance from "@/hooks/useMaintenance";
 import { firebaseConfigured } from "@/lib/firebase";
 import { modules } from "@/lib/modules";
 import { Machine, MaintenanceRecord, ModuleId } from "@/types";
+
+type Feedback = {
+  type: "success" | "error";
+  message: string;
+};
+
+type PendingDelete =
+  | { kind: "machine"; item: Machine }
+  | { kind: "maintenance"; item: MaintenanceRecord }
+  | null;
 
 const emptyMaintenance = (machineId = ""): MaintenanceRecord => ({
   id: crypto.randomUUID(),
@@ -64,11 +76,30 @@ export default function AppShell() {
   const [detail, setDetail] = useState<Machine | null>(null);
   const [editingMaintenance, setEditingMaintenance] =
     useState<MaintenanceRecord | null>(null);
-  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [pendingDelete, setPendingDelete] =
+    useState<PendingDelete>(null);
 
   const showError = useCallback((message: string) => {
-    setError(message);
+    setFeedback({ type: "error", message });
   }, []);
+
+  const showSuccess = useCallback((message: string) => {
+    setFeedback({ type: "success", message });
+  }, []);
+
+  useEffect(() => {
+    if (feedback?.type !== "success") {
+      return;
+    }
+
+    const timeout = window.setTimeout(
+      () => setFeedback(null),
+      4500
+    );
+
+    return () => window.clearTimeout(timeout);
+  }, [feedback]);
 
   const {
     user,
@@ -116,15 +147,30 @@ export default function AppShell() {
     [machines, queryText]
   );
 
-  async function handleDelete(machine: Machine) {
-    if (!confirm(`Eliminare ${machine.brand} ${machine.model}?`)) {
+  async function confirmDelete() {
+    if (!pendingDelete) {
       return;
     }
 
     try {
-      await deleteMachine(machine);
+      if (pendingDelete.kind === "machine") {
+        const machine = pendingDelete.item;
+        await deleteMachine(machine);
+        showSuccess(
+          `${machine.brand} ${machine.model} eliminata correttamente.`
+        );
+      } else {
+        const record = pendingDelete.item;
+        await deleteMaintenance(record);
+        showSuccess(
+          `Intervento “${record.title}” eliminato correttamente.`
+        );
+      }
+
+      setPendingDelete(null);
     } catch {
-      // L'errore viene già mostrato da useMachines.
+      setPendingDelete(null);
+      // L'errore viene già mostrato dall'hook interessato.
     }
   }
 
@@ -223,13 +269,12 @@ export default function AppShell() {
       </aside>
 
       <main>
-        {error && (
-          <div className="alert">
-            {error}
-            <button onClick={() => setError("")}>
-              <X size={16} />
-            </button>
-          </div>
+        {feedback && (
+          <FeedbackBanner
+            type={feedback.type}
+            message={feedback.message}
+            close={() => setFeedback(null)}
+          />
         )}
 
         {active === "dashboard" ? (
@@ -244,7 +289,10 @@ export default function AppShell() {
             openNew={() => setEditing(emptyMachine())}
             openEdit={setEditing}
             openDetail={setDetail}
-            onDelete={handleDelete}
+            onDelete={(machine) =>
+              setPendingDelete({ kind: "machine", item: machine })
+            }
+            loading={machinesLoading}
           />
         ) : active === "maintenance" ? (
           <MaintenancePage
@@ -254,21 +302,13 @@ export default function AppShell() {
               setEditingMaintenance(emptyMaintenance())
             }
             openEdit={setEditingMaintenance}
-            onDelete={async (record) => {
-              if (
-                !confirm(
-                  `Eliminare l’intervento ${record.title}?`
-                )
-              ) {
-                return;
-              }
-
-              try {
-                await deleteMaintenance(record);
-              } catch {
-                // L'errore viene già mostrato da useMaintenance.
-              }
-            }}
+            onDelete={(record) =>
+              setPendingDelete({
+                kind: "maintenance",
+                item: record,
+              })
+            }
+            loading={maintenanceLoading}
           />
         ) : (
           <ComingSoon active={active} />
@@ -284,6 +324,9 @@ export default function AppShell() {
             try {
               await saveMachine({ machine, photo });
               setEditing(null);
+              showSuccess(
+                `${machine.brand} ${machine.model} salvata correttamente.`
+              );
             } catch {
               // L'errore viene già mostrato da useMachines.
             }
@@ -306,7 +349,6 @@ export default function AppShell() {
           addMaintenance={() =>
             setEditingMaintenance(emptyMaintenance(detail.id))
           }
-          onError={setError}
         />
       )}
 
@@ -320,10 +362,35 @@ export default function AppShell() {
             try {
               await saveMaintenance(record);
               setEditingMaintenance(null);
+              showSuccess(
+                `Intervento “${record.title}” salvato correttamente.`
+              );
             } catch {
               // L'errore viene già mostrato da useMaintenance.
             }
           }}
+        />
+      )}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={
+            pendingDelete.kind === "machine"
+              ? "Eliminare la macchina?"
+              : "Eliminare l’intervento?"
+          }
+          message={
+            pendingDelete.kind === "machine"
+              ? `${pendingDelete.item.brand} ${pendingDelete.item.model} e i relativi dati verranno eliminati definitivamente.`
+              : `L’intervento “${pendingDelete.item.title}” verrà eliminato definitivamente.`
+          }
+          busy={
+            pendingDelete.kind === "machine"
+              ? machinesLoading
+              : maintenanceLoading
+          }
+          cancel={() => setPendingDelete(null)}
+          confirm={confirmDelete}
         />
       )}
     </div>

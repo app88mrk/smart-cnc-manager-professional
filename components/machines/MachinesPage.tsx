@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { Machine } from "@/types";
 
 interface MachinesPageProps {
@@ -9,6 +9,7 @@ interface MachinesPageProps {
   openEdit: (machine: Machine) => void;
   openDetail: (machine: Machine) => void;
   onDelete: (machine: Machine) => void;
+  loading: boolean;
 }
 
 export default function MachinesPage({
@@ -17,6 +18,7 @@ export default function MachinesPage({
   openEdit,
   openDetail,
   onDelete,
+  loading,
 }: MachinesPageProps) {
   return (
     <>
@@ -30,6 +32,13 @@ export default function MachinesPage({
           <Plus size={18} /> Nuova macchina
         </button>
       </div>
+
+      {loading && (
+        <div className="inlineLoading" role="status">
+          <LoaderCircle className="spinner" size={18} />
+          Aggiornamento macchine…
+        </div>
+      )}
 
       <section className="machineGrid">
         {machines.length ? (
