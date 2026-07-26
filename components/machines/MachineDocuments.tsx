@@ -1,14 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Download, ExternalLink, FileText, Trash2, Upload } from "lucide-react";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import FeedbackBanner from "@/components/common/FeedbackBanner";
-import {
-  listMachineDocuments,
-  removeMachineDocument,
-  uploadMachineDocument,
-} from "@/lib/documents";
+import useMachineDocuments from "@/hooks/useMachineDocuments";
 import { MachineDocument } from "@/types";
 
 interface MachineDocumentsProps {
@@ -20,9 +16,6 @@ export default function MachineDocuments({
   uid,
   machineId,
 }: MachineDocumentsProps) {
-  const [documents, setDocuments] = useState<MachineDocument[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [pendingDelete, setPendingDelete] =
     useState<MachineDocument | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -30,33 +23,30 @@ export default function MachineDocuments({
     message: string;
   } | null>(null);
 
-  async function refreshDocuments() {
-    setLoading(true);
-    try {
-      setDocuments(await listMachineDocuments(uid, machineId));
-    } catch (error) {
-      setFeedback({ type: "error", message: errorMessage(error) });
-    } finally {
-      setLoading(false);
-    }
-  }
+  const showError = useCallback((message: string) => {
+    setFeedback({ type: "error", message });
+  }, []);
 
-  useEffect(() => {
-    refreshDocuments();
-  }, [uid, machineId]);
+  const {
+    documents,
+    documentsLoading,
+    documentsBusy,
+    uploadDocuments,
+    deleteDocument,
+  } = useMachineDocuments({
+    uid,
+    machineId,
+    onError: showError,
+  });
 
   async function uploadFiles(files: FileList | null) {
     if (!files?.length) return;
 
     const selectedFiles = Array.from(files);
-    setBusy(true);
     setFeedback(null);
 
     try {
-      for (const file of selectedFiles) {
-        await uploadMachineDocument(uid, machineId, file);
-      }
-      await refreshDocuments();
+      await uploadDocuments(selectedFiles);
       setFeedback({
         type: "success",
         message:
@@ -64,30 +54,24 @@ export default function MachineDocuments({
             ? "Documento caricato correttamente."
             : `${selectedFiles.length} documenti caricati correttamente.`,
       });
-    } catch (error) {
-      setFeedback({ type: "error", message: errorMessage(error) });
-    } finally {
-      setBusy(false);
+    } catch {
+      // L'errore viene mostrato da useMachineDocuments.
     }
   }
 
   async function remove(document: MachineDocument) {
-    setBusy(true);
     setFeedback(null);
 
     try {
-      await removeMachineDocument(uid, document);
-      await refreshDocuments();
+      await deleteDocument(document);
       setPendingDelete(null);
       setFeedback({
         type: "success",
         message: "Documento eliminato correttamente.",
       });
-    } catch (error) {
+    } catch {
       setPendingDelete(null);
-      setFeedback({ type: "error", message: errorMessage(error) });
-    } finally {
-      setBusy(false);
+      // L'errore viene mostrato da useMachineDocuments.
     }
   }
 
@@ -100,13 +84,17 @@ export default function MachineDocuments({
             <span>PDF, schemi, backup CNC, immagini e documenti tecnici.</span>
           </div>
 
-          <label className={`documentUpload ${busy ? "disabled" : ""}`}>
+          <label
+            className={`documentUpload ${
+              documentsBusy ? "disabled" : ""
+            }`}
+          >
             <Upload size={17} />
-            {busy ? "Caricamento…" : "Carica file"}
+            {documentsBusy ? "Caricamento…" : "Carica file"}
             <input
               type="file"
               multiple
-              disabled={busy}
+              disabled={documentsBusy}
               onChange={(event) => {
                 uploadFiles(event.target.files);
                 event.currentTarget.value = "";
@@ -125,7 +113,7 @@ export default function MachineDocuments({
           </div>
         )}
 
-        {loading ? (
+        {documentsLoading ? (
           <div className="documentsEmpty">Caricamento documenti…</div>
         ) : documents.length ? (
           <div className="documentList">
@@ -146,7 +134,7 @@ export default function MachineDocuments({
                   <button
                     type="button"
                     onClick={() => setPendingDelete(document)}
-                    disabled={busy}
+                    disabled={documentsBusy}
                     title="Elimina"
                   >
                     <Trash2 size={17} />
@@ -168,7 +156,7 @@ export default function MachineDocuments({
         <ConfirmDialog
           title="Eliminare il documento?"
           message={`“${pendingDelete.name}” verrà eliminato definitivamente.`}
-          busy={busy}
+          busy={documentsBusy}
           cancel={() => setPendingDelete(null)}
           confirm={() => remove(pendingDelete)}
         />
@@ -189,8 +177,4 @@ function formatDate(value: string) {
     month: "2-digit",
     year: "numeric",
   }).format(new Date(value));
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Si è verificato un errore.";
 }
