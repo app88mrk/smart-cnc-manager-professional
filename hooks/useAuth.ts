@@ -11,6 +11,7 @@ import {
   auth,
   firebaseConfigured,
 } from "@/lib/firebase";
+import { isAllowedUser } from "@/lib/access";
 
 type UseAuthOptions = {
   onError: (message: string) => void;
@@ -23,17 +24,44 @@ export default function useAuth({
   const [authReady, setAuthReady] = useState(
     !firebaseConfigured
   );
+  const [accessError, setAccessError] = useState("");
 
   useEffect(() => {
-    if (!auth) {
+    const authInstance = auth;
+
+    if (!authInstance) {
       return;
     }
 
-    return onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthReady(true);
-    });
-  }, []);
+    return onAuthStateChanged(
+      authInstance,
+      (currentUser) => {
+        if (
+          currentUser &&
+          !isAllowedUser(currentUser.uid)
+        ) {
+          setUser(null);
+          setAuthReady(true);
+          setAccessError(
+            "Questo account non è autorizzato."
+          );
+
+          void signOut(authInstance).catch((error) => {
+            onError(errorMessage(error));
+          });
+
+          return;
+        }
+
+        if (currentUser) {
+          setAccessError("");
+        }
+
+        setUser(currentUser);
+        setAuthReady(true);
+      }
+    );
+  }, [onError]);
 
   const logout = useCallback(async () => {
     if (!auth) {
@@ -51,6 +79,7 @@ export default function useAuth({
   return {
     user,
     authReady,
+    accessError,
     logout,
   };
 }

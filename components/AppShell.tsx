@@ -73,6 +73,7 @@ export default function AppShell() {
   const {
     user,
     authReady,
+    accessError,
     logout,
   } = useAuth({
     onError: showError,
@@ -134,7 +135,12 @@ export default function AppShell() {
   }
 
   if (firebaseConfigured && !user) {
-    return <AuthScreen errorMessage={errorMessage} />;
+    return (
+      <AuthScreen
+        errorMessage={errorMessage}
+        accessError={accessError}
+      />
+    );
   }
 
   return (

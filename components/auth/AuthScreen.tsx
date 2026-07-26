@@ -1,18 +1,19 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
+
 import { auth } from "@/lib/firebase";
 
 type AuthScreenProps = {
   errorMessage: (error: unknown) => string;
+  accessError?: string;
 };
 
-export default function AuthScreen({ errorMessage }: AuthScreenProps) {
-  const [register, setRegister] = useState(false);
+export default function AuthScreen({
+  errorMessage,
+  accessError = "",
+}: AuthScreenProps) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -32,13 +33,13 @@ export default function AuthScreen({ errorMessage }: AuthScreenProps) {
       const email = String(formData.get("email"));
       const password = String(formData.get("password"));
 
-      if (register) {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
-    } catch (error) {
-      setError(errorMessage(error));
+      await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+    } catch (submitError) {
+      setError(errorMessage(submitError));
     } finally {
       setBusy(false);
     }
@@ -56,11 +57,17 @@ export default function AuthScreen({ errorMessage }: AuthScreenProps) {
           </div>
         </div>
 
-        <h1>{register ? "Crea account" : "Accesso personale"}</h1>
+        <h1>Accesso personale</h1>
 
-        <p>I dati e i file saranno protetti nel tuo spazio Firebase.</p>
+        <p>
+          Area privata riservata all&apos;utente autorizzato.
+        </p>
 
-        {error && <div className="authError">{error}</div>}
+        {(error || accessError) && (
+          <div className="authError">
+            {error || accessError}
+          </div>
+        )}
 
         <label>
           Email
@@ -79,26 +86,12 @@ export default function AuthScreen({ errorMessage }: AuthScreenProps) {
             type="password"
             required
             minLength={6}
-            autoComplete={register ? "new-password" : "current-password"}
+            autoComplete="current-password"
           />
         </label>
 
         <button className="primary" disabled={busy}>
-          {busy
-            ? "Attendere…"
-            : register
-              ? "Crea account"
-              : "Accedi"}
-        </button>
-
-        <button
-          type="button"
-          className="linkButton"
-          onClick={() => setRegister(!register)}
-        >
-          {register
-            ? "Hai già un account? Accedi"
-            : "Primo accesso? Crea account"}
+          {busy ? "Attendere…" : "Accedi"}
         </button>
       </form>
     </div>
