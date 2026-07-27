@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BookOpen,
   Calculator,
@@ -19,6 +19,10 @@ import type {
   CatalogSearchPage,
   ImportedCatalog,
 } from "@/lib/catalogImport";
+import {
+  type CuttingProfile,
+  profileLabels,
+} from "@/lib/cuttingParameters";
 
 type CatalogGuidedCalculatorProps = {
   activeSelection: CatalogCalculationSelection | null;
@@ -35,6 +39,8 @@ const operationNames: Record<
   turning: "Tornitura",
 };
 
+const MAX_TOOL_RESULTS = 12;
+
 export default function CatalogGuidedCalculator({
   activeSelection,
   catalogs,
@@ -44,135 +50,72 @@ export default function CatalogGuidedCalculator({
   const [operation, setOperation] =
     useState<CatalogCalculationOperation>("drilling");
   const [query, setQuery] = useState("");
-  const [materialFilter, setMaterialFilter] = useState("all");
-  const [pageId, setPageId] = useState("");
-  const [article, setArticle] = useState("");
-  const [family, setFamily] = useState("");
-  const [material, setMaterial] = useState("");
-  const [vc, setVc] = useState("");
-  const [feed, setFeed] = useState("");
-  const [ap, setAp] = useState("");
-  const [ae, setAe] = useState("");
+  const [material, setMaterial] = useState("all");
+  const [profile, setProfile] =
+    useState<CuttingProfile>("conservative");
 
+  const catalogOptions = catalogs.filter(
+    (catalog) =>
+      catalogId === "all" || catalog.id === catalogId,
+  );
   const materialOptions = useMemo(
     () =>
       Array.from(
         new Set(
-          catalogs
-            .filter(
-              (catalog) =>
-                catalogId === "all" || catalog.id === catalogId,
-            )
-            .flatMap((catalog) =>
-              catalog.pages.flatMap((page) => page.materials),
-            ),
+          catalogOptions.flatMap((catalog) =>
+            catalog.pages.flatMap((page) => page.materials),
+          ),
         ),
       ).sort(),
-    [catalogId, catalogs],
+    [catalogOptions],
   );
 
-  const candidates = useMemo(
-    () =>
-      searchCatalogPages(catalogs, query, catalogId)
-        .filter((page) => pageMatchesOperation(page, operation))
-        .filter(
-          (page) =>
-            materialFilter === "all" ||
-            page.materials.includes(materialFilter),
-        )
-        .filter((page) => {
-          const feedKind = feedKindForOperation(operation, page);
-          return Boolean(
-            page.parameters.vc.length &&
-              page.parameters[feedKind].length,
-          );
-        })
-        .slice(0, 60),
-    [catalogId, catalogs, materialFilter, operation, query],
-  );
+  const results = useMemo(() => {
+    const normalizedQuery = foldText(query);
 
-  const selectedPage =
-    candidates.find((page) => page.id === pageId) || null;
-  const feedKind = selectedPage
-    ? feedKindForOperation(operation, selectedPage)
-    : operation === "milling"
-      ? "fz"
-      : "feed";
-  const canApply = Boolean(selectedPage && vc && feed);
+    return searchCatalogPages(catalogs, query, catalogId)
+      .filter((page) => pageMatchesOperation(page, operation))
+      .filter(
+        (page) =>
+          material === "all" ||
+          page.materials.includes(material),
+      )
+      .filter((page) => hasCalculationData(page, operation))
+      .sort(
+        (left, right) =>
+          candidateScore(right, normalizedQuery) -
+            candidateScore(left, normalizedQuery) ||
+          left.page - right.page,
+      )
+      .slice(0, MAX_TOOL_RESULTS);
+  }, [catalogId, catalogs, material, operation, query]);
 
-  useEffect(() => {
-    if (
-      catalogId !== "all" &&
-      !catalogs.some((catalog) => catalog.id === catalogId)
-    ) {
-      setCatalogId("all");
-    }
-  }, [catalogId, catalogs]);
-
-  useEffect(() => {
-    if (!pageId) {
-      return;
-    }
-
-    if (!candidates.some((page) => page.id === pageId)) {
-      setPageId("");
-    }
-  }, [candidates, pageId]);
-
-  useEffect(() => {
-    if (!selectedPage) {
-      setArticle("");
-      setFamily("");
-      setMaterial("");
-      setVc("");
-      setFeed("");
-      setAp("");
-      setAe("");
-      return;
-    }
-
-    const nextFeedKind = feedKindForOperation(
-      operation,
-      selectedPage,
-    );
-    setArticle(selectedPage.codes[0] || "");
-    setFamily(selectedPage.families[0] || "");
-    setMaterial(selectedPage.materials[0] || "");
-    setVc(selectedPage.parameters.vc[0] || "");
-    setFeed(selectedPage.parameters[nextFeedKind][0] || "");
-    setAp(selectedPage.parameters.ap[0] || "");
-    setAe(selectedPage.parameters.ae[0] || "");
-  }, [operation, selectedPage]);
-
-  function changeOperation(
-    nextOperation: CatalogCalculationOperation,
-  ) {
-    setOperation(nextOperation);
-    setPageId("");
-  }
-
-  function applyCatalogCalculation() {
-    if (!selectedPage || !canApply) {
-      return;
-    }
+  function applyPage(page: CatalogSearchPage) {
+    const feedKind = feedKindForOperation(operation, page);
+    const exactArticle = articleForQuery(page, query);
+    const matchingFamily = familyForQuery(page, query);
 
     onApply({
-      pageId: selectedPage.id,
-      catalogId: selectedPage.catalogId,
-      catalogName: selectedPage.catalogName,
-      page: selectedPage.page,
+      pageId: page.id,
+      catalogId: page.catalogId,
+      catalogName: page.catalogName,
+      page: page.page,
       operation,
-      family,
-      article,
-      material,
-      vc,
-      feed,
+      family: matchingFamily,
+      article: exactArticle,
+      material:
+        material !== "all"
+          ? material
+          : page.materials[0] || "",
+      vc: page.parameters.vc[0],
+      feed: page.parameters[feedKind][0],
       feedKind,
-      ap,
-      ae,
+      ap: page.parameters.ap[0] || "",
+      ae: page.parameters.ae[0] || "",
+      profile,
       excerpt: catalogPageExcerpt(
-        selectedPage,
-        article || family || query,
+        page,
+        exactArticle || matchingFamily || query,
       ),
     });
   }
@@ -184,9 +127,9 @@ export default function CatalogGuidedCalculator({
         <div>
           <b>Carica il primo catalogo PDF</b>
           <span>
-            Usa il pulsante “Carica catalogo PDF” nell’archivio. Dopo
-            l’indicizzazione, il calcolo guidato userà esclusivamente
-            i dati trovati nei tuoi cataloghi.
+            Premi “Carica catalogo PDF” nell’archivio in fondo alla
+            pagina. Dopo l’indicizzazione compariranno qui gli utensili
+            utilizzabili nel calcolo.
           </span>
         </div>
       </div>
@@ -198,33 +141,13 @@ export default function CatalogGuidedCalculator({
       <div className="guidedCatalogHead">
         <Sparkles size={18} />
         <div>
-          <b>Calcolo guidato dai tuoi cataloghi</b>
+          <b>Calcolo automatico dai tuoi cataloghi</b>
           <span>
-            Scegli lavorazione e utensile: il calcolatore recupera Vc
-            e avanzamento dal PDF selezionato.
+            Scegli la lavorazione e cerca l’utensile. Vc,
+            avanzamento e profondità vengono applicati senza
+            ricopiarli dal PDF.
           </span>
         </div>
-      </div>
-
-      <div className="guidedCatalogFilters">
-        <label className="full">
-          <span>Catalogo da utilizzare</span>
-          <select
-            aria-label="Catalogo da utilizzare"
-            value={catalogId}
-            onChange={(event) => {
-              setCatalogId(event.target.value);
-              setPageId("");
-            }}
-          >
-            <option value="all">Tutti i cataloghi caricati</option>
-            {catalogs.map((catalog) => (
-              <option value={catalog.id} key={catalog.id}>
-                {catalog.name}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
 
       <div
@@ -243,7 +166,7 @@ export default function CatalogGuidedCalculator({
             aria-selected={operation === item}
             className={operation === item ? "active" : ""}
             key={item}
-            onClick={() => changeOperation(item)}
+            onClick={() => setOperation(item)}
           >
             {operationNames[item]}
           </button>
@@ -251,33 +174,30 @@ export default function CatalogGuidedCalculator({
       </div>
 
       <div className="guidedCatalogFilters">
-        <label className="guidedSearch full">
-          <span>Codice, utensile o famiglia</span>
-          <div>
-            <Search size={16} />
-            <input
-              aria-label="Cerca nel catalogo per il calcolo"
-              value={query}
-              placeholder="Es. 25 0654, DNMG, punta HSS, fresa HM…"
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setPageId("");
-              }}
-            />
-          </div>
+        <label>
+          <span>Catalogo</span>
+          <select
+            aria-label="Catalogo da utilizzare"
+            value={catalogId}
+            onChange={(event) => setCatalogId(event.target.value)}
+          >
+            <option value="all">Tutti i cataloghi caricati</option>
+            {catalogs.map((catalog) => (
+              <option value={catalog.id} key={catalog.id}>
+                {catalog.name}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label>
           <span>Materiale da lavorare</span>
           <select
             aria-label="Materiale da catalogo"
-            value={materialFilter}
-            onChange={(event) => {
-              setMaterialFilter(event.target.value);
-              setPageId("");
-            }}
+            value={material}
+            onChange={(event) => setMaterial(event.target.value)}
           >
-            <option value="all">Tutti i materiali rilevati</option>
+            <option value="all">Tutti i materiali</option>
             {materialOptions.map((item) => (
               <option value={item} key={item}>
                 {item}
@@ -286,117 +206,138 @@ export default function CatalogGuidedCalculator({
           </select>
         </label>
 
-        <label>
-          <span>Scheda trovata</span>
+        <label className="guidedSearch full">
+          <span>Utensile o codice articolo</span>
+          <div>
+            <Search size={16} />
+            <input
+              aria-label="Cerca utensile o codice nel catalogo"
+              value={query}
+              placeholder="Es. DNMG, 25 0654, punta HSS, fresa HM…"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+          <small>
+            Se conosci il codice, scrivilo per individuare la pagina
+            più precisa.
+          </small>
+        </label>
+
+        <label className="full">
+          <span>Impostazione di lavoro</span>
           <select
-            aria-label="Scheda catalogo per il calcolo"
-            value={pageId}
-            onChange={(event) => setPageId(event.target.value)}
+            aria-label="Impostazione dati catalogo"
+            value={profile}
+            onChange={(event) =>
+              setProfile(event.target.value as CuttingProfile)
+            }
           >
-            <option value="">
-              {candidates.length
-                ? `${candidates.length} schede compatibili…`
-                : "Nessuna scheda compatibile"}
-            </option>
-            {candidates.map((page) => (
-              <option value={page.id} key={page.id}>
-                {candidateLabel(page)}
+            {(
+              Object.keys(profileLabels) as CuttingProfile[]
+            ).map((item) => (
+              <option value={item} key={item}>
+                {profileLabels[item]}
               </option>
             ))}
           </select>
         </label>
       </div>
 
-      {selectedPage ? (
-        <div className="guidedCatalogChoice">
-          <div className="guidedCatalogChoiceHead">
-            <div>
-              <span>{selectedPage.catalogName}</span>
-              <b>Pagina {selectedPage.page}</b>
-            </div>
-            <CheckCircle2 size={19} />
-          </div>
+      <div className="guidedResultCount">
+        <b>
+          {results.length}{" "}
+          {results.length === 1
+            ? "utensile compatibile"
+            : "utensili compatibili"}
+        </b>
+        <span>
+          {query
+            ? "Risultati ordinati per corrispondenza."
+            : "Scrivi un codice o una famiglia per restringere la scelta."}
+        </span>
+      </div>
 
-          <div className="guidedCatalogValues">
-            <CatalogValueSelect
-              label="Codice articolo"
-              value={article}
-              values={selectedPage.codes}
-              allowEmpty
-              onChange={setArticle}
-            />
-            <CatalogValueSelect
-              label="Famiglia utensile"
-              value={family}
-              values={selectedPage.families}
-              allowEmpty
-              onChange={setFamily}
-            />
-            <CatalogValueSelect
-              label="Materiale"
-              value={material}
-              values={selectedPage.materials}
-              allowEmpty
-              onChange={setMaterial}
-            />
-            <CatalogValueSelect
-              label="Vc"
-              suffix="m/min"
-              value={vc}
-              values={selectedPage.parameters.vc}
-              onChange={setVc}
-            />
-            <CatalogValueSelect
-              label={feedKind === "fz" ? "fz" : "f"}
-              suffix={
-                feedKind === "fz" ? "mm/dente" : "mm/giro"
-              }
-              value={feed}
-              values={selectedPage.parameters[feedKind]}
-              onChange={setFeed}
-            />
-            <CatalogValueSelect
-              label="ap"
-              suffix="mm"
-              value={ap}
-              values={selectedPage.parameters.ap}
-              allowEmpty
-              onChange={setAp}
-            />
-            <CatalogValueSelect
-              label="ae"
-              suffix="mm"
-              value={ae}
-              values={selectedPage.parameters.ae}
-              allowEmpty
-              onChange={setAe}
-            />
-          </div>
+      {results.length ? (
+        <div className="guidedToolResults">
+          {results.map((page) => {
+            const feedKind = feedKindForOperation(operation, page);
+            const active = activeSelection?.pageId === page.id;
+            const exactArticle = articleForQuery(page, query);
+            const displayReference =
+              exactArticle ||
+              familyForQuery(page, query) ||
+              page.codes[0] ||
+              "Scheda catalogo";
 
-          <p>
-            Controlla che i valori selezionati appartengano alla stessa
-            riga o colonna del materiale e della geometria scelti.
-          </p>
+            return (
+              <article
+                className={`guidedToolCard ${
+                  active ? "active" : ""
+                }`}
+                key={page.id}
+              >
+                <div className="guidedToolTop">
+                  <div>
+                    <span>
+                      {page.catalogName} · pagina {page.page}
+                    </span>
+                    <b>{displayReference}</b>
+                  </div>
+                  {active && <CheckCircle2 size={18} />}
+                </div>
 
-          <button
-            className="guidedCatalogApply"
-            type="button"
-            disabled={!canApply}
-            onClick={applyCatalogCalculation}
-          >
-            <Calculator size={17} />
-            {activeSelection?.pageId === selectedPage.id
-              ? "Ricalcola con questi dati"
-              : "Calcola con questi dati"}
-          </button>
+                <div className="guidedToolTags">
+                  {page.families.slice(0, 3).map((item) => (
+                    <span key={item}>{item}</span>
+                  ))}
+                  {page.materials.slice(0, 2).map((item) => (
+                    <span key={item}>{item}</span>
+                  ))}
+                </div>
+
+                <dl>
+                  <div>
+                    <dt>Vc</dt>
+                    <dd>{page.parameters.vc[0]} m/min</dd>
+                  </div>
+                  <div>
+                    <dt>{feedKind === "fz" ? "fz" : "f"}</dt>
+                    <dd>
+                      {page.parameters[feedKind][0]}{" "}
+                      {feedKind === "fz"
+                        ? "mm/dente"
+                        : "mm/giro"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>ap</dt>
+                    <dd>
+                      {page.parameters.ap[0]
+                        ? `${page.parameters.ap[0]} mm`
+                        : "Non indicata"}
+                    </dd>
+                  </div>
+                </dl>
+
+                <button
+                  type="button"
+                  onClick={() => applyPage(page)}
+                >
+                  <Calculator size={16} />
+                  {active
+                    ? "Parametri applicati"
+                    : "Usa questo utensile"}
+                </button>
+              </article>
+            );
+          })}
         </div>
       ) : (
         <div className="guidedCatalogWaiting">
           <Search size={19} />
           <span>
-            {candidates.length
-              ? "Scegli una scheda compatibile per vedere e applicare i parametri."
-              : "Prova un altro codice, materiale o tipo di lavorazione."}
+            Nessun utensile con Vc e avanzamento compatibili. Cambia
+            ricerca, materiale o lavorazione.
           </span>
         </div>
       )}
@@ -404,48 +345,15 @@ export default function CatalogGuidedCalculator({
   );
 }
 
-function CatalogValueSelect({
-  allowEmpty = false,
-  label,
-  onChange,
-  suffix = "",
-  value,
-  values,
-}: {
-  allowEmpty?: boolean;
-  label: string;
-  onChange: (value: string) => void;
-  suffix?: string;
-  value: string;
-  values: string[];
-}) {
-  return (
-    <label>
-      <span>{label}</span>
-      <select
-        value={value}
-        disabled={!values.length && !allowEmpty}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {allowEmpty && <option value="">Non indicato</option>}
-        {!values.length && !allowEmpty && (
-          <option value="">Non rilevato</option>
-        )}
-        {values.map((item) => (
-          <option value={item} key={item}>
-            {item}
-            {suffix ? ` ${suffix}` : ""}
-          </option>
-        ))}
-      </select>
-    </label>
+function hasCalculationData(
+  page: CatalogSearchPage,
+  operation: CatalogCalculationOperation,
+) {
+  const feedKind = feedKindForOperation(operation, page);
+  return Boolean(
+    page.parameters.vc.length &&
+      page.parameters[feedKind].length,
   );
-}
-
-function candidateLabel(page: CatalogSearchPage) {
-  const reference =
-    page.codes[0] || page.families[0] || "Parametri rilevati";
-  return `${page.catalogName} · pag. ${page.page} · ${reference}`;
 }
 
 function pageMatchesOperation(
@@ -479,4 +387,77 @@ function feedKindForOperation(
   }
 
   return "feed" as const;
+}
+
+function articleForQuery(
+  page: CatalogSearchPage,
+  query: string,
+) {
+  const foldedQuery = foldText(query);
+  if (!foldedQuery || !/\d/.test(foldedQuery)) {
+    return "";
+  }
+
+  return (
+    page.codes.find(
+      (code) => foldText(code) === foldedQuery,
+    ) ||
+    page.codes.find((code) =>
+      foldText(code).includes(foldedQuery),
+    ) ||
+    ""
+  );
+}
+
+function familyForQuery(
+  page: CatalogSearchPage,
+  query: string,
+) {
+  const foldedQuery = foldText(query);
+  return (
+    page.families.find((family) =>
+      foldText(family).includes(foldedQuery),
+    ) ||
+    page.families[0] ||
+    ""
+  );
+}
+
+function candidateScore(
+  page: CatalogSearchPage,
+  query: string,
+) {
+  if (!query) {
+    return page.parameterCount;
+  }
+
+  const exactCode = page.codes.some(
+    (code) => foldText(code) === query,
+  );
+  const exactFamily = page.families.some(
+    (family) => foldText(family) === query,
+  );
+  const partialCode = page.codes.some((code) =>
+    foldText(code).includes(query),
+  );
+  const partialFamily = page.families.some((family) =>
+    foldText(family).includes(query),
+  );
+
+  return (
+    (exactCode ? 10_000 : 0) +
+    (exactFamily ? 8_000 : 0) +
+    (partialCode ? 4_000 : 0) +
+    (partialFamily ? 2_000 : 0) +
+    page.parameterCount
+  );
+}
+
+function foldText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }

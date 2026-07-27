@@ -212,10 +212,13 @@ export default function CuttingParametersPage({
   function useCatalogSelection(
     selection: CatalogCalculationSelection,
   ) {
+    const selectionProfile =
+      selection.profile || "conservative";
     resetWorkData();
     setSourceMode("catalog");
     setCatalogSelection(selection);
     setOperation(selection.operation);
+    setProfile(selectionProfile);
 
     if (selection.operation === "turning") {
       const matchingShape = cuttingPresets.find(
@@ -232,7 +235,7 @@ export default function CuttingParametersPage({
     setVc(
       String(
         roundValue(
-          valueForCatalogProfile(selection.vc, "conservative"),
+          valueForCatalogProfile(selection.vc, selectionProfile),
           2,
         ),
       ),
@@ -240,7 +243,7 @@ export default function CuttingParametersPage({
     setFeed(
       String(
         roundValue(
-          valueForCatalogProfile(selection.feed, "conservative"),
+          valueForCatalogProfile(selection.feed, selectionProfile),
           3,
         ),
       ),
@@ -606,9 +609,9 @@ export default function CuttingParametersPage({
             <div className="catalogDataPending">
               <BookOpen size={18} />
               <span>
-                Seleziona una scheda del catalogo e premi “Calcola con
-                questi dati”. Poi inserirai solo diametro, lunghezza e
-                gli eventuali limiti della macchina.
+                Scegli un utensile dai risultati. Poi inserirai solo
+                diametro, lunghezza e gli eventuali limiti della
+                macchina.
               </span>
             </div>
           )}
@@ -787,7 +790,7 @@ export default function CuttingParametersPage({
                 ? "Valori estratti dal PDF: verifica che Vc, avanzamento e profondità appartengano alla stessa colonna di materiale, grado e geometria prima della produzione."
                 : sourceMode === "manual"
                   ? "Valori manuali: confrontali con il catalogo del costruttore e parti con condizioni prudenti prima della produzione."
-                  : "Seleziona una scheda nella ricerca guidata. Il calcolo userà soltanto i valori presenti nei cataloghi caricati da te."}
+                  : "Scegli un utensile nella ricerca guidata. Il calcolo userà soltanto i valori presenti nei cataloghi caricati da te."}
             </span>
           </div>
         </div>

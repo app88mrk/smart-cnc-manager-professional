@@ -3,7 +3,7 @@
 Applicazione professionale per organizzare dati, documentazione e attività di
 un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-Versione corrente: **2.7.0**.
+Versione corrente: **2.7.1**.
 
 ## Moduli disponibili
 
@@ -39,6 +39,8 @@ Versione corrente: **2.7.0**.
   - fonte PDF, articolo e pagina mantenuti nel risultato di calcolo;
   - calcolo guidato con scelta di catalogo, lavorazione, materiale,
     codice e scheda tecnica compatibile;
+  - risultati presentati come utensili pronti da applicare, senza
+    dover scegliere manualmente pagina e singoli valori estratti;
   - recupero di `Vc`, `f/fz`, `ap` e `ae` direttamente dai PDF caricati;
   - calcolo manuale separato, con campi inizialmente vuoti;
   - assenza di valori preimpostati finché non viene scelta una scheda;

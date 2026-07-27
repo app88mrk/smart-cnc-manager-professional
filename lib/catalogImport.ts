@@ -47,6 +47,7 @@ export type CatalogCalculationSelection = {
   feedKind: "feed" | "fz";
   ap: string;
   ae: string;
+  profile?: "conservative" | "standard" | "productive";
   excerpt: string;
 };
 
