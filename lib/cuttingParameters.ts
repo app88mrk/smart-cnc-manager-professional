@@ -36,6 +36,7 @@ export type DiameterFeedPoint = {
 export type CuttingPreset = {
   id: string;
   operation: CuttingOperation;
+  insertShape?: string;
   family: string;
   name: string;
   article: string;
@@ -278,6 +279,7 @@ export const cuttingPresets: CuttingPreset[] = [
   {
     id: "hoffmann-250158-hb7020",
     operation: "turning",
+    insertShape: "CNMG",
     family: "Placchetta tornio",
     name: "GARANT CNMG 120408 SM HB7020-2",
     article: "25 0158",
@@ -294,6 +296,7 @@ export const cuttingPresets: CuttingPreset[] = [
   {
     id: "hoffmann-250158-hb7130",
     operation: "turning",
+    insertShape: "CNMG",
     family: "Placchetta tornio",
     name: "GARANT CNMG 120408 VM HB7130-2",
     article: "25 0158",
@@ -310,6 +313,7 @@ export const cuttingPresets: CuttingPreset[] = [
   {
     id: "hoffmann-250158-hb7210",
     operation: "turning",
+    insertShape: "CNMG",
     family: "Placchetta tornio",
     name: "GARANT CNMG 120408 GM HB7210-1",
     article: "25 0158",
@@ -326,6 +330,7 @@ export const cuttingPresets: CuttingPreset[] = [
   {
     id: "hoffmann-250158-hu7305",
     operation: "turning",
+    insertShape: "CNMG",
     family: "Placchetta tornio",
     name: "GARANT CNMG 120408 AM1 HU7305-1",
     article: "25 0158",
@@ -342,6 +347,7 @@ export const cuttingPresets: CuttingPreset[] = [
   {
     id: "hoffmann-250158-hb7415",
     operation: "turning",
+    insertShape: "CNMG",
     family: "Placchetta tornio",
     name: "GARANT CNMG 120408 TIM HB7415-1",
     article: "25 0158",
@@ -356,8 +362,128 @@ export const cuttingPresets: CuttingPreset[] = [
       "Geometria TIM per titanio e leghe resistenti al calore.",
   },
   {
+    id: "hoffmann-250654-hb7020",
+    operation: "turning",
+    insertShape: "DNMG",
+    family: "Placchetta negativa 55°",
+    name: "GARANT DNMG 110408 SS HB7020-2",
+    article: "25 0654",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 737,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [160, 400], feed: [0.1, 0.4], ap: [0.3, 2] },
+    },
+    note:
+      "Inserto romboidale DNMG da 55°, rompitruciolo SS per la finitura dell’acciaio.",
+  },
+  {
+    id: "hoffmann-251036-hb7020",
+    operation: "turning",
+    insertShape: "KNUX",
+    family: "Placchetta negativa 55°",
+    name: "GARANT KNUX 160410R SM HB7020-2",
+    article: "25 1036",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 741,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [130, 370], feed: [0.2, 0.5], ap: [0.3, 4] },
+    },
+    note:
+      "Inserto KNUX destro per lavorazione media dell’acciaio, rompitruciolo SM.",
+  },
+  {
+    id: "hoffmann-251144-hb7020",
+    operation: "turning",
+    insertShape: "SNMG",
+    family: "Placchetta negativa quadrata",
+    name: "GARANT SNMG 120408 SS HB7020-2",
+    article: "25 1144",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 743,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [160, 400], feed: [0.1, 0.4], ap: [0.3, 2] },
+    },
+    note:
+      "Inserto quadrato SNMG, rompitruciolo SS per la finitura dell’acciaio.",
+  },
+  {
+    id: "hoffmann-251434-hb7020",
+    operation: "turning",
+    insertShape: "TNMG",
+    family: "Placchetta negativa triangolare",
+    name: "GARANT TNMG 160408 SS HB7020-2",
+    article: "25 1434",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 747,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [160, 400], feed: [0.1, 0.4], ap: [0.3, 2] },
+    },
+    note:
+      "Inserto triangolare TNMG, rompitruciolo SS per la finitura dell’acciaio.",
+  },
+  {
+    id: "hoffmann-251734-hb7020",
+    operation: "turning",
+    insertShape: "VNMG",
+    family: "Placchetta negativa 35°",
+    name: "GARANT VNMG 160408 SS HB7020-2",
+    article: "25 1734",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 751,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [160, 400], feed: [0.1, 0.4], ap: [0.3, 2] },
+    },
+    note:
+      "Inserto romboidale VNMG da 35°, rompitruciolo SS per la finitura dell’acciaio.",
+  },
+  {
+    id: "hoffmann-251964-hb7020",
+    operation: "turning",
+    insertShape: "WNMG",
+    family: "Placchetta negativa trigonale",
+    name: "GARANT WNMG 080408 SS HB7020-2",
+    article: "25 1964",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 755,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [160, 400], feed: [0.1, 0.4], ap: [0.3, 2] },
+    },
+    note:
+      "Inserto trigonale WNMG, rompitruciolo SS per la finitura dell’acciaio.",
+  },
+  {
+    id: "hoffmann-255770-kb7205",
+    operation: "turning",
+    insertShape: "RNGN",
+    family: "Placchetta tonda in ceramica",
+    name: "GARANT RNGN 120700 KB7205",
+    article: "25 5770",
+    toolMaterial: "Ceramica",
+    coating: "KB7205",
+    page: 763,
+    feedMode: "per-revolution",
+    materials: {
+      "h-65": { vc: [180, 250], feed: [0.05, 0.15], ap: [0.1, 0.8] },
+    },
+    note:
+      "Inserto tondo in ceramica per lavorazioni su materiali temprati; tagliente 0,1 mm × 20°.",
+  },
+  {
     id: "hoffmann-260052-hb7020",
     operation: "turning",
+    insertShape: "CCMT",
     family: "Placchetta tornio positiva",
     name: "GARANT CCMT 060204 SS HB7020-2",
     article: "26 0052",
@@ -370,6 +496,108 @@ export const cuttingPresets: CuttingPreset[] = [
     },
     note:
       "Inserto positivo CCMT, rompitruciolo SS per finitura e lavorazione media.",
+  },
+  {
+    id: "hoffmann-260359-hb7020",
+    operation: "turning",
+    insertShape: "DCGT / DCMT",
+    family: "Placchetta positiva 55°",
+    name: "GARANT DCMT 11T304 SS HB7020-2",
+    article: "26 0359",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 782,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [140, 400], feed: [0.07, 0.25], ap: [0.2, 1.5] },
+    },
+    note:
+      "Inserto positivo DCMT da 55°, rompitruciolo SS per la finitura dell’acciaio.",
+  },
+  {
+    id: "hoffmann-260640-hb7020",
+    operation: "turning",
+    insertShape: "RC.T / RC.X",
+    family: "Placchetta positiva tonda",
+    name: "GARANT RC.X 1003 SM HB7020-2",
+    article: "26 0640",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 786,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [110, 350], feed: [0.08, 0.3], ap: [0.3, 2] },
+    },
+    note:
+      "Inserto positivo tondo RC.X, rompitruciolo SM per lavorazione media dell’acciaio.",
+  },
+  {
+    id: "hoffmann-260744-hb7020",
+    operation: "turning",
+    insertShape: "SCGT / SCMT",
+    family: "Placchetta positiva quadrata",
+    name: "GARANT SCMT 09T308 SS HB7020-2",
+    article: "26 0744",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 788,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [140, 400], feed: [0.07, 0.25], ap: [0.2, 1.5] },
+    },
+    note:
+      "Inserto positivo quadrato SCMT, rompitruciolo SS per la finitura dell’acciaio.",
+  },
+  {
+    id: "hoffmann-260952-hb7020",
+    operation: "turning",
+    insertShape: "TCGT / TCMT",
+    family: "Placchetta positiva triangolare",
+    name: "GARANT TCMT 110204 SS HB7020-2",
+    article: "26 0952",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 791,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [140, 400], feed: [0.07, 0.25], ap: [0.2, 1.5] },
+    },
+    note:
+      "Inserto positivo triangolare TCMT, rompitruciolo SS per la finitura dell’acciaio.",
+  },
+  {
+    id: "hoffmann-261152-hb7020",
+    operation: "turning",
+    insertShape: "VBGT / VBMT",
+    family: "Placchetta positiva 35°",
+    name: "GARANT VBMT 160404 SS HB7020-2",
+    article: "26 1152",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 795,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [140, 400], feed: [0.07, 0.25], ap: [0.2, 1.5] },
+    },
+    note:
+      "Inserto positivo VBMT da 35°, rompitruciolo SS per la finitura dell’acciaio.",
+  },
+  {
+    id: "hoffmann-261372-hb7020",
+    operation: "turning",
+    insertShape: "VCGT / VCMT",
+    family: "Placchetta positiva 35°",
+    name: "GARANT VC.T 160404 SS HB7020-2",
+    article: "26 1372",
+    toolMaterial: "Metallo duro rivestito",
+    coating: "HB7020-2",
+    page: 805,
+    feedMode: "per-revolution",
+    materials: {
+      "p-900": { vc: [140, 400], feed: [0.07, 0.25], ap: [0.2, 1.5] },
+    },
+    note:
+      "Famiglia positiva VCGT/VCMT da 35°, finitura dell’acciaio con rompitruciolo SS.",
   },
 ];
 

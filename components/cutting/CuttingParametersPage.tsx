@@ -41,12 +41,33 @@ export default function CuttingParametersPage({
 }: CuttingParametersPageProps) {
   const [operation, setOperation] =
     useState<CuttingOperation>("drilling");
-  const availablePresets = useMemo(
+  const operationPresets = useMemo(
     () =>
       cuttingPresets.filter(
         (preset) => preset.operation === operation,
       ),
     [operation],
+  );
+  const turningShapes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          operationPresets
+            .map((preset) => preset.insertShape)
+            .filter((shape): shape is string => Boolean(shape)),
+        ),
+      ),
+    [operationPresets],
+  );
+  const [insertShape, setInsertShape] = useState("CNMG");
+  const availablePresets = useMemo(
+    () =>
+      operation === "turning"
+        ? operationPresets.filter(
+            (preset) => preset.insertShape === insertShape,
+          )
+        : operationPresets,
+    [insertShape, operation, operationPresets],
   );
   const [presetId, setPresetId] = useState(
     cuttingPresets[0].id,
@@ -78,6 +99,16 @@ export default function CuttingParametersPage({
     preset.materials[materialId] ||
     preset.materials[availableMaterials[0]]!;
   const numericDiameter = positiveNumber(diameter);
+
+  useEffect(() => {
+    if (
+      operation === "turning" &&
+      turningShapes.length &&
+      !turningShapes.includes(insertShape)
+    ) {
+      setInsertShape(turningShapes[0]);
+    }
+  }, [insertShape, operation, turningShapes]);
 
   useEffect(() => {
     if (!availablePresets.some((item) => item.id === presetId)) {
@@ -265,6 +296,31 @@ export default function CuttingParametersPage({
           </div>
 
           <div className="cuttingFormGrid">
+            {operation === "turning" && (
+              <label className="full">
+                <span>Forma placchetta</span>
+                <select
+                  value={insertShape}
+                  onChange={(event) =>
+                    setInsertShape(event.target.value)
+                  }
+                >
+                  {turningShapes.map((shape) => {
+                    const count = operationPresets.filter(
+                      (item) => item.insertShape === shape,
+                    ).length;
+
+                    return (
+                      <option value={shape} key={shape}>
+                        {shape} · {count}{" "}
+                        {count === 1 ? "scheda" : "schede"}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+            )}
+
             <label className="full">
               <span>Utensile dal catalogo</span>
               <select
@@ -523,6 +579,9 @@ export default function CuttingParametersPage({
             </div>
 
             <div className="sourceTags">
+              {preset.insertShape && (
+                <span>Forma {preset.insertShape}</span>
+              )}
               <span>{preset.toolMaterial}</span>
               <span>{preset.coating}</span>
               <span>Pagina {preset.page}</span>

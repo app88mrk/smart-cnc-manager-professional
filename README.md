@@ -3,7 +3,7 @@
 Applicazione professionale per organizzare dati, documentazione e attività di
 un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-Versione corrente: **2.2.0**.
+Versione corrente: **2.3.0**.
 
 ## Moduli disponibili
 
@@ -22,6 +22,9 @@ Versione corrente: **2.2.0**.
   - calcolo di giri mandrino, avanzamento e tempo stimato;
   - modalità foratura, fresatura e tornitura;
   - punte HSS e HM, frese HSS e HM e placchette;
+  - selezione dedicata tra 15 famiglie di placchette da tornitura:
+    CNMG, DNMG, KNUX, SNMG, TNMG, VNMG, WNMG, RNGN, CCMT,
+    DCGT/DCMT, RC.T/RC.X, SCGT/SCMT, TCGT/TCMT, VBGT/VBMT e VCGT/VCMT;
   - materiali ISO N, P, M, K, S e H;
   - profili prudente, catalogo e produttivo;
   - controllo dei limiti di giri e avanzamento della macchina;
