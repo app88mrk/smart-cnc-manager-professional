@@ -3,5 +3,6 @@ node_modules
 .env.local
 .vercel
 *.log
+.npm-cache
 
 .vercel

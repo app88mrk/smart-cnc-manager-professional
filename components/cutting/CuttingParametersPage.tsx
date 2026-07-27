@@ -31,6 +31,7 @@ import {
   valueForProfile,
 } from "@/lib/cuttingParameters";
 import { Machine } from "@/types";
+import CatalogManager from "@/components/cutting/CatalogManager";
 
 type CuttingParametersPageProps = {
   machines: Machine[];
@@ -270,6 +271,8 @@ export default function CuttingParametersPage({
           </div>
         </div>
       </div>
+
+      <CatalogManager />
 
       <section className="cuttingLayout">
         <div className="panel cuttingInputs">

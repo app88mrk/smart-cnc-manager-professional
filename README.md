@@ -3,7 +3,7 @@
 Applicazione professionale per organizzare dati, documentazione e attività di
 un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-Versione corrente: **2.3.0**.
+Versione corrente: **2.4.0**.
 
 ## Moduli disponibili
 
@@ -30,6 +30,12 @@ Versione corrente: **2.3.0**.
   - controllo dei limiti di giri e avanzamento della macchina;
   - codice articolo e pagina sorgente del catalogo sempre visibili;
   - valori iniziali verificati sul catalogo Hoffmann Group 56.
+- Archivio cataloghi PDF con:
+  - caricamento multiplo e indicizzazione automatica pagina per pagina;
+  - ricerca per codice, famiglia, marca, materiale e testo;
+  - rilevamento di `Vc`, `f`, `fz`, `ap` e `ae`;
+  - pagina sorgente e anteprima del testo sempre visibili;
+  - salvataggio locale persistente nel browser tramite IndexedDB.
 - Lavorazioni.
 - Storico allarmi.
 - Knowledge Base.
