@@ -24,6 +24,32 @@ export type CatalogPageRecord = {
   parameterCount: number;
 };
 
+export type CatalogCalculationOperation =
+  | "drilling"
+  | "milling"
+  | "turning";
+
+export type CatalogSearchPage = CatalogPageRecord & {
+  catalogName: string;
+};
+
+export type CatalogCalculationSelection = {
+  pageId: string;
+  catalogId: string;
+  catalogName: string;
+  page: number;
+  operation: CatalogCalculationOperation;
+  family: string;
+  article: string;
+  material: string;
+  vc: string;
+  feed: string;
+  feedKind: "feed" | "fz";
+  ap: string;
+  ae: string;
+  excerpt: string;
+};
+
 export type ImportedCatalog = {
   id: string;
   name: string;
@@ -323,7 +349,7 @@ export function searchCatalogPages(
   catalogs: ImportedCatalog[],
   query: string,
   catalogId = "all",
-) {
+): CatalogSearchPage[] {
   const tokens = foldText(query)
     .split(/\s+/)
     .map((token) => token.trim())

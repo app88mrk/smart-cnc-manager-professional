@@ -3,7 +3,7 @@
 Applicazione professionale per organizzare dati, documentazione e attività di
 un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-Versione corrente: **2.4.0**.
+Versione corrente: **2.5.0**.
 
 ## Moduli disponibili
 
@@ -34,6 +34,9 @@ Versione corrente: **2.4.0**.
   - caricamento multiplo e indicizzazione automatica pagina per pagina;
   - ricerca per codice, famiglia, marca, materiale e testo;
   - rilevamento di `Vc`, `f`, `fz`, `ap` e `ae`;
+  - selezione della riga catalogo e trasferimento dei valori nel calcolatore;
+  - profilo prudente, standard o produttivo applicato agli intervalli rilevati;
+  - fonte PDF, articolo e pagina mantenuti nel risultato di calcolo;
   - pagina sorgente e anteprima del testo sempre visibili;
   - salvataggio locale persistente nel browser tramite IndexedDB.
 - Lavorazioni.

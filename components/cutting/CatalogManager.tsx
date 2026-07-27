@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  ChangeEvent,
+  type ChangeEvent,
   useDeferredValue,
   useEffect,
   useMemo,
@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   BookOpen,
+  Calculator,
   CheckCircle2,
   FileSearch,
   FileUp,
@@ -22,8 +23,6 @@ import {
 
 import {
   CatalogImportCancelledError,
-  CatalogImportProgress,
-  ImportedCatalog,
   catalogPageExcerpt,
   deleteImportedCatalog,
   extractCatalogFromFile,
@@ -31,6 +30,13 @@ import {
   loadImportedCatalogs,
   saveImportedCatalog,
   searchCatalogPages,
+} from "@/lib/catalogImport";
+import type {
+  CatalogCalculationOperation,
+  CatalogCalculationSelection,
+  CatalogImportProgress,
+  CatalogSearchPage,
+  ImportedCatalog,
 } from "@/lib/catalogImport";
 
 const MAX_VISIBLE_RESULTS = 80;
@@ -43,7 +49,21 @@ const quickSearches = [
   "avanzamento",
 ];
 
-export default function CatalogManager() {
+type CatalogManagerProps = {
+  activeCatalogId?: string;
+  activePageId?: string;
+  onClearCalculation: () => void;
+  onUseForCalculation: (
+    selection: CatalogCalculationSelection,
+  ) => void;
+};
+
+export default function CatalogManager({
+  activeCatalogId,
+  activePageId,
+  onClearCalculation,
+  onUseForCalculation,
+}: CatalogManagerProps) {
   const fileInput = useRef<HTMLInputElement>(null);
   const cancelRequested = useRef(false);
   const [catalogs, setCatalogs] = useState<ImportedCatalog[]>(
@@ -142,6 +162,9 @@ export default function CatalogManager() {
           );
         }
 
+        if (activeCatalogId === catalog.id) {
+          onClearCalculation();
+        }
         await saveImportedCatalog(catalog);
         setCatalogs((current) => [
           catalog,
@@ -186,6 +209,9 @@ export default function CatalogManager() {
       );
       if (catalogId === catalog.id) {
         setCatalogId("all");
+      }
+      if (activeCatalogId === catalog.id) {
+        onClearCalculation();
       }
       setPendingDelete("");
       setFeedback(`Catalogo “${catalog.name}” eliminato.`);
@@ -416,7 +442,9 @@ export default function CatalogManager() {
               <div className="catalogResults">
                 {visibleResults.map((page) => (
                   <article
-                    className="catalogResultCard"
+                    className={`catalogResultCard ${
+                      activePageId === page.id ? "active" : ""
+                    }`}
                     key={page.id}
                   >
                     <div className="catalogResultTop">
@@ -474,6 +502,12 @@ export default function CatalogManager() {
                       Valori rilevati sulla pagina: verificare la
                       colonna associata a materiale, grado e geometria.
                     </small>
+
+                    <CatalogCalculationPicker
+                      active={activePageId === page.id}
+                      page={page}
+                      onUseForCalculation={onUseForCalculation}
+                    />
                   </article>
                 ))}
               </div>
@@ -483,6 +517,249 @@ export default function CatalogManager() {
       )}
     </section>
   );
+}
+
+function CatalogCalculationPicker({
+  active,
+  page,
+  onUseForCalculation,
+}: {
+  active: boolean;
+  page: CatalogSearchPage;
+  onUseForCalculation: (
+    selection: CatalogCalculationSelection,
+  ) => void;
+}) {
+  const initialOperation = inferCatalogOperation(page);
+  const [operation, setOperation] =
+    useState<CatalogCalculationOperation>(initialOperation);
+  const [family, setFamily] = useState(page.families[0] || "");
+  const [article, setArticle] = useState(page.codes[0] || "");
+  const [material, setMaterial] = useState(
+    page.materials[0] || "",
+  );
+  const [vc, setVc] = useState(page.parameters.vc[0] || "");
+  const initialFeedKind = feedKindForOperation(
+    initialOperation,
+    page,
+  );
+  const [feed, setFeed] = useState(
+    page.parameters[initialFeedKind][0] || "",
+  );
+  const [ap, setAp] = useState(page.parameters.ap[0] || "");
+  const [ae, setAe] = useState(page.parameters.ae[0] || "");
+  const feedKind = feedKindForOperation(operation, page);
+  const feedOptions = page.parameters[feedKind];
+  const canApply = Boolean(vc && feed);
+
+  function changeOperation(next: CatalogCalculationOperation) {
+    const nextFeedKind = feedKindForOperation(next, page);
+    setOperation(next);
+    setFeed(page.parameters[nextFeedKind][0] || "");
+  }
+
+  function applyToCalculation() {
+    if (!canApply) {
+      return;
+    }
+
+    onUseForCalculation({
+      pageId: page.id,
+      catalogId: page.catalogId,
+      catalogName: page.catalogName,
+      page: page.page,
+      operation,
+      family,
+      article,
+      material,
+      vc,
+      feed,
+      feedKind,
+      ap,
+      ae,
+      excerpt: catalogPageExcerpt(page, article || family),
+    });
+  }
+
+  return (
+    <div className="catalogCalculationPicker">
+      <div className="catalogCalculationTitle">
+        <Calculator size={16} />
+        <div>
+          <b>Usa nel calcolo</b>
+          <span>
+            Seleziona i valori della stessa riga o colonna.
+          </span>
+        </div>
+      </div>
+
+      <div className="catalogCalculationFields">
+        <label>
+          <span>Lavorazione</span>
+          <select
+            value={operation}
+            onChange={(event) =>
+              changeOperation(
+                event.target.value as CatalogCalculationOperation,
+              )
+            }
+          >
+            <option value="drilling">Foratura</option>
+            <option value="milling">Fresatura</option>
+            <option value="turning">Tornitura</option>
+          </select>
+        </label>
+
+        {page.codes.length > 0 && (
+          <CatalogValueSelect
+            label="Codice"
+            value={article}
+            values={page.codes}
+            onChange={setArticle}
+          />
+        )}
+        {page.families.length > 0 && (
+          <CatalogValueSelect
+            label="Famiglia"
+            value={family}
+            values={page.families}
+            onChange={setFamily}
+          />
+        )}
+        {page.materials.length > 0 && (
+          <CatalogValueSelect
+            label="Materiale"
+            value={material}
+            values={page.materials}
+            onChange={setMaterial}
+          />
+        )}
+        <CatalogValueSelect
+          label="Vc"
+          suffix="m/min"
+          value={vc}
+          values={page.parameters.vc}
+          onChange={setVc}
+        />
+        <CatalogValueSelect
+          label={feedKind === "fz" ? "fz" : "f"}
+          suffix={feedKind === "fz" ? "mm/dente" : "mm/giro"}
+          value={feed}
+          values={feedOptions}
+          onChange={setFeed}
+        />
+        <CatalogValueSelect
+          label="ap"
+          suffix="mm"
+          value={ap}
+          values={page.parameters.ap}
+          allowEmpty
+          onChange={setAp}
+        />
+        <CatalogValueSelect
+          label="ae"
+          suffix="mm"
+          value={ae}
+          values={page.parameters.ae}
+          allowEmpty
+          onChange={setAe}
+        />
+      </div>
+
+      {!canApply && (
+        <span className="catalogCalculationMissing">
+          Per calcolare servono almeno Vc e f oppure fz sulla stessa
+          pagina.
+        </span>
+      )}
+
+      <button
+        className={`catalogUseButton ${active ? "active" : ""}`}
+        type="button"
+        disabled={!canApply}
+        onClick={applyToCalculation}
+      >
+        <Calculator size={16} />
+        {active
+          ? "Dati in uso nel calcolo"
+          : "Usa questi dati nel calcolo"}
+      </button>
+    </div>
+  );
+}
+
+function CatalogValueSelect({
+  allowEmpty = false,
+  label,
+  onChange,
+  suffix = "",
+  value,
+  values,
+}: {
+  allowEmpty?: boolean;
+  label: string;
+  onChange: (value: string) => void;
+  suffix?: string;
+  value: string;
+  values: string[];
+}) {
+  if (!values.length && !allowEmpty) {
+    return (
+      <label className="unavailable">
+        <span>{label}</span>
+        <select disabled>
+          <option>Non rilevato</option>
+        </select>
+      </label>
+    );
+  }
+
+  return (
+    <label>
+      <span>{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {allowEmpty && <option value="">Non indicato</option>}
+        {values.map((item) => (
+          <option value={item} key={item}>
+            {item}
+            {suffix ? ` ${suffix}` : ""}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function inferCatalogOperation(
+  page: CatalogSearchPage,
+): CatalogCalculationOperation {
+  const families = page.families.join(" ").toLowerCase();
+
+  if (families.includes("punte")) {
+    return "drilling";
+  }
+  if (families.includes("frese") || page.parameters.fz.length) {
+    return "milling";
+  }
+
+  return "turning";
+}
+
+function feedKindForOperation(
+  operation: CatalogCalculationOperation,
+  page: CatalogSearchPage,
+) {
+  if (operation === "milling" && page.parameters.fz.length) {
+    return "fz" as const;
+  }
+  if (page.parameters.feed.length) {
+    return "feed" as const;
+  }
+
+  return "fz" as const;
 }
 
 function ParameterValues({

@@ -32,6 +32,7 @@ import {
 } from "@/lib/cuttingParameters";
 import { Machine } from "@/types";
 import CatalogManager from "@/components/cutting/CatalogManager";
+import type { CatalogCalculationSelection } from "@/lib/catalogImport";
 
 type CuttingParametersPageProps = {
   machines: Machine[];
@@ -92,6 +93,8 @@ export default function CuttingParametersPage({
   const [cutLength, setCutLength] = useState("50");
   const [vc, setVc] = useState("0");
   const [feed, setFeed] = useState("0");
+  const [catalogSelection, setCatalogSelection] =
+    useState<CatalogCalculationSelection | null>(null);
   const [machineId, setMachineId] = useState("");
   const [maxRpm, setMaxRpm] = useState("");
   const [maxFeed, setMaxFeed] = useState("");
@@ -99,6 +102,11 @@ export default function CuttingParametersPage({
   const recommendation =
     preset.materials[materialId] ||
     preset.materials[availableMaterials[0]]!;
+  const effectiveFeedMode = catalogSelection
+    ? catalogSelection.feedKind === "fz"
+      ? "per-tooth"
+      : "per-revolution"
+    : preset.feedMode;
   const numericDiameter = positiveNumber(diameter);
 
   useEffect(() => {
@@ -124,6 +132,32 @@ export default function CuttingParametersPage({
   }, [availableMaterials, materialId]);
 
   useEffect(() => {
+    if (catalogSelection) {
+      setVc(
+        String(
+          roundValue(
+            valueForCatalogProfile(
+              catalogSelection.vc,
+              profile,
+            ),
+            2,
+          ),
+        ),
+      );
+      setFeed(
+        String(
+          roundValue(
+            valueForCatalogProfile(
+              catalogSelection.feed,
+              profile,
+            ),
+            3,
+          ),
+        ),
+      );
+      return;
+    }
+
     const currentMaterial =
       preset.materials[materialId] ||
       preset.materials[availableMaterials[0]];
@@ -167,6 +201,7 @@ export default function CuttingParametersPage({
     );
   }, [
     availableMaterials,
+    catalogSelection,
     materialId,
     numericDiameter,
     preset,
@@ -208,7 +243,7 @@ export default function CuttingParametersPage({
         ? Math.min(requestedRpm, rpmLimit)
         : requestedRpm;
     const requestedFeed =
-      preset.feedMode === "per-tooth"
+      effectiveFeedMode === "per-tooth"
         ? rpm * teethValue * feedValue
         : rpm * feedValue;
     const machineFeed =
@@ -234,7 +269,7 @@ export default function CuttingParametersPage({
     feed,
     maxFeed,
     maxRpm,
-    preset.feedMode,
+    effectiveFeedMode,
     teeth,
     vc,
   ]);
@@ -251,38 +286,116 @@ export default function CuttingParametersPage({
     }
   }
 
+  function useCatalogSelection(
+    selection: CatalogCalculationSelection,
+  ) {
+    setCatalogSelection(selection);
+    setOperation(selection.operation);
+
+    if (selection.operation === "turning") {
+      const matchingShape = cuttingPresets.find(
+        (item) =>
+          item.operation === "turning" &&
+          item.insertShape === selection.family,
+      )?.insertShape;
+
+      if (matchingShape) {
+        setInsertShape(matchingShape);
+      }
+    }
+
+    setVc(
+      String(
+        roundValue(
+          valueForCatalogProfile(selection.vc, profile),
+          2,
+        ),
+      ),
+    );
+    setFeed(
+      String(
+        roundValue(
+          valueForCatalogProfile(selection.feed, profile),
+          3,
+        ),
+      ),
+    );
+
+    requestAnimationFrame(() => {
+      document
+        .getElementById("cutting-calculator")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   return (
     <>
       <div className="pageHead cuttingHead">
         <div>
-          <p>STEP 12 · CALCOLO PROFESSIONALE</p>
+          <p>STEP 14 · CATALOGHI COLLEGATI AL CALCOLO</p>
           <h1>Parametri di taglio</h1>
           <span>
-            Valori di partenza dal catalogo Hoffmann Group 56,
-            con fonte e pagina sempre visibili.
+            Usa i dati dei cataloghi PDF caricati oppure le
+            preimpostazioni verificate.
           </span>
         </div>
 
         <div className="catalogBadge">
           <BookOpen size={18} />
           <div>
-            <b>Catalogo 56</b>
-            <span>Valido dal 01/08/2025</span>
+            <b>
+              {catalogSelection
+                ? catalogSelection.catalogName
+                : "Cataloghi PDF"}
+            </b>
+            <span>
+              {catalogSelection
+                ? `Pagina ${catalogSelection.page} in uso`
+                : "Archivio collegato al calcolo"}
+            </span>
           </div>
         </div>
       </div>
 
-      <CatalogManager />
+      <CatalogManager
+        activeCatalogId={catalogSelection?.catalogId}
+        activePageId={catalogSelection?.pageId}
+        onClearCalculation={() => setCatalogSelection(null)}
+        onUseForCalculation={useCatalogSelection}
+      />
 
-      <section className="cuttingLayout">
+      <section className="cuttingLayout" id="cutting-calculator">
         <div className="panel cuttingInputs">
           <div className="cuttingSectionTitle">
             <Calculator size={19} />
             <div>
               <b>Dati di lavorazione</b>
-              <span>Scegli utensile, materiale e macchina.</span>
+              <span>
+                {catalogSelection
+                  ? "Valori ricavati dal catalogo caricato."
+                  : "Scegli utensile, materiale e macchina."}
+              </span>
             </div>
           </div>
+
+          {catalogSelection && (
+            <div className="catalogAppliedBanner">
+              <CheckCircle2 size={17} />
+              <div>
+                <b>Dati catalogo applicati</b>
+                <span>
+                  {catalogSelection.article || "Articolo non indicato"}{" "}
+                  · pagina {catalogSelection.page}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCatalogSelection(null)}
+              >
+                Torna ai valori preimpostati
+              </button>
+            </div>
+          )}
 
           <div className="operationTabs" role="tablist">
             {(
@@ -291,7 +404,10 @@ export default function CuttingParametersPage({
               <button
                 key={item}
                 className={operation === item ? "active" : ""}
-                onClick={() => setOperation(item)}
+                onClick={() => {
+                  setCatalogSelection(null);
+                  setOperation(item);
+                }}
               >
                 {operationLabels[item]}
               </button>
@@ -304,9 +420,10 @@ export default function CuttingParametersPage({
                 <span>Forma placchetta</span>
                 <select
                   value={insertShape}
-                  onChange={(event) =>
-                    setInsertShape(event.target.value)
-                  }
+                  onChange={(event) => {
+                    setCatalogSelection(null);
+                    setInsertShape(event.target.value);
+                  }}
                 >
                   {turningShapes.map((shape) => {
                     const count = operationPresets.filter(
@@ -325,12 +442,13 @@ export default function CuttingParametersPage({
             )}
 
             <label className="full">
-              <span>Utensile dal catalogo</span>
+              <span>Utensile preimpostato</span>
               <select
                 value={preset.id}
-                onChange={(event) =>
-                  setPresetId(event.target.value)
-                }
+                onChange={(event) => {
+                  setCatalogSelection(null);
+                  setPresetId(event.target.value);
+                }}
               >
                 {availablePresets.map((item) => (
                   <option value={item.id} key={item.id}>
@@ -344,11 +462,12 @@ export default function CuttingParametersPage({
               <span>Materiale da lavorare</span>
               <select
                 value={materialId}
-                onChange={(event) =>
+                onChange={(event) => {
+                  setCatalogSelection(null);
                   setMaterialId(
                     event.target.value as typeof materialId,
-                  )
-                }
+                  );
+                }}
               >
                 {availableMaterials.map((item) => (
                   <option value={item} key={item}>
@@ -431,7 +550,7 @@ export default function CuttingParametersPage({
 
             <label>
               <span>
-                {preset.feedMode === "per-tooth"
+                {effectiveFeedMode === "per-tooth"
                   ? "fz (mm/dente)"
                   : "f (mm/giro)"}
               </span>
@@ -552,61 +671,113 @@ export default function CuttingParametersPage({
               <div>
                 <dt>Formula avanzamento</dt>
                 <dd>
-                  {preset.feedMode === "per-tooth"
+                  {effectiveFeedMode === "per-tooth"
                     ? "Vf = n × Z × fz"
                     : "Vf = n × f"}
                 </dd>
               </div>
               <div>
                 <dt>Valore catalogo Vc</dt>
-                <dd>{formatRange(recommendation.vc, " m/min")}</dd>
+                <dd>
+                  {catalogSelection
+                    ? `${catalogSelection.vc} m/min`
+                    : formatRange(recommendation.vc, " m/min")}
+                </dd>
               </div>
               <div>
                 <dt>Profondità ap</dt>
-                <dd>{formatRange(recommendation.ap, " mm")}</dd>
+                <dd>
+                  {catalogSelection
+                    ? catalogSelection.ap
+                      ? `${catalogSelection.ap} mm`
+                      : "Non indicata"
+                    : formatRange(recommendation.ap, " mm")}
+                </dd>
               </div>
               <div>
                 <dt>Impegno ae</dt>
-                <dd>{recommendation.ae || "Vedi nota utensile"}</dd>
+                <dd>
+                  {catalogSelection
+                    ? catalogSelection.ae
+                      ? `${catalogSelection.ae} mm`
+                      : "Non indicato"
+                    : recommendation.ae || "Vedi nota utensile"}
+                </dd>
               </div>
             </dl>
           </section>
 
-          <section className="panel sourcePanel">
-            <div className="sourceTop">
-              <div>
-                <span>{preset.family}</span>
-                <h2>{preset.name}</h2>
+          {catalogSelection ? (
+            <section className="panel sourcePanel catalogSourcePanel">
+              <div className="sourceTop">
+                <div>
+                  <span>Catalogo PDF caricato</span>
+                  <h2>{catalogSelection.catalogName}</h2>
+                </div>
+                <b>
+                  {catalogSelection.article ||
+                    `Pagina ${catalogSelection.page}`}
+                </b>
               </div>
-              <b>{preset.article}</b>
-            </div>
 
-            <div className="sourceTags">
-              {preset.insertShape && (
-                <span>Forma {preset.insertShape}</span>
-              )}
-              <span>{preset.toolMaterial}</span>
-              <span>{preset.coating}</span>
-              <span>Pagina {preset.page}</span>
-            </div>
+              <div className="sourceTags">
+                {catalogSelection.family && (
+                  <span>{catalogSelection.family}</span>
+                )}
+                {catalogSelection.material && (
+                  <span>{catalogSelection.material}</span>
+                )}
+                <span>Pagina {catalogSelection.page}</span>
+                <span>Vc {catalogSelection.vc} m/min</span>
+                <span>
+                  {catalogSelection.feedKind === "fz" ? "fz" : "f"}{" "}
+                  {catalogSelection.feed}
+                </span>
+              </div>
 
-            <p>{preset.note}</p>
-
-            {preset.diameterMin && (
+              <p>{catalogSelection.excerpt}</p>
               <small>
-                Campo presente nel catalogo: Ø{" "}
-                {formatCuttingNumber(preset.diameterMin)}–
-                {formatCuttingNumber(preset.diameterMax || 0)} mm.
+                Fonte selezionata dall’archivio cataloghi. I valori
+                restano modificabili nei campi del calcolatore.
               </small>
-            )}
-          </section>
+            </section>
+          ) : (
+            <section className="panel sourcePanel">
+              <div className="sourceTop">
+                <div>
+                  <span>{preset.family}</span>
+                  <h2>{preset.name}</h2>
+                </div>
+                <b>{preset.article}</b>
+              </div>
+
+              <div className="sourceTags">
+                {preset.insertShape && (
+                  <span>Forma {preset.insertShape}</span>
+                )}
+                <span>{preset.toolMaterial}</span>
+                <span>{preset.coating}</span>
+                <span>Pagina {preset.page}</span>
+              </div>
+
+              <p>{preset.note}</p>
+
+              {preset.diameterMin && (
+                <small>
+                  Campo presente nel catalogo: Ø{" "}
+                  {formatCuttingNumber(preset.diameterMin)}–
+                  {formatCuttingNumber(preset.diameterMax || 0)} mm.
+                </small>
+              )}
+            </section>
+          )}
 
           <div className="cuttingDisclaimer">
             <AlertTriangle size={18} />
             <span>
-              Valori iniziali del costruttore: partire dal profilo
-              prudente e correggere in base a sporgenza, serraggio,
-              refrigerazione, stabilità e potenza disponibili.
+              {catalogSelection
+                ? "Valori estratti dal PDF: verifica che Vc, avanzamento e profondità appartengano alla stessa colonna di materiale, grado e geometria prima della produzione."
+                : "Valori iniziali del costruttore: partire dal profilo prudente e correggere in base a sporgenza, serraggio, refrigerazione, stabilità e potenza disponibili."}
             </span>
           </div>
         </div>
@@ -645,6 +816,35 @@ function positiveNumber(value: string) {
 function roundValue(value: number, digits: number) {
   const multiplier = 10 ** digits;
   return Math.round(value * multiplier) / multiplier;
+}
+
+function valueForCatalogProfile(
+  value: string,
+  profile: CuttingProfile,
+) {
+  const numbers = [
+    ...value.replace(/,/g, ".").matchAll(/\d+(?:\.\d+)?/g),
+  ]
+    .map((match) => Number(match[0]))
+    .filter((item) => Number.isFinite(item));
+
+  if (!numbers.length) {
+    return 0;
+  }
+  if (numbers.length === 1) {
+    return numbers[0];
+  }
+
+  const minimum = Math.min(numbers[0], numbers[1]);
+  const maximum = Math.max(numbers[0], numbers[1]);
+  const share =
+    profile === "conservative"
+      ? 0
+      : profile === "standard"
+        ? 0.5
+        : 1;
+
+  return minimum + (maximum - minimum) * share;
 }
 
 function parseSpindleRpm(value: string) {
