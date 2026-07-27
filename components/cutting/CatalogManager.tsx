@@ -52,6 +52,8 @@ const quickSearches = [
 type CatalogManagerProps = {
   activeCatalogId?: string;
   activePageId?: string;
+  catalogFilterId?: string;
+  onCatalogsChange: (catalogs: ImportedCatalog[]) => void;
   onClearCalculation: () => void;
   onUseForCalculation: (
     selection: CatalogCalculationSelection,
@@ -61,6 +63,8 @@ type CatalogManagerProps = {
 export default function CatalogManager({
   activeCatalogId,
   activePageId,
+  catalogFilterId,
+  onCatalogsChange,
   onClearCalculation,
   onUseForCalculation,
 }: CatalogManagerProps) {
@@ -78,7 +82,6 @@ export default function CatalogManager({
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  const [catalogId, setCatalogId] = useState("all");
   const [pendingDelete, setPendingDelete] = useState("");
 
   useEffect(() => {
@@ -108,10 +111,18 @@ export default function CatalogManager({
     };
   }, []);
 
+  useEffect(() => {
+    onCatalogsChange(catalogs);
+  }, [catalogs, onCatalogsChange]);
+
   const results = useMemo(
     () =>
-      searchCatalogPages(catalogs, deferredQuery, catalogId),
-    [catalogId, catalogs, deferredQuery],
+      searchCatalogPages(
+        catalogs,
+        deferredQuery,
+        catalogFilterId || "all",
+      ),
+    [catalogFilterId, catalogs, deferredQuery],
   );
   const visibleResults = results.slice(0, MAX_VISIBLE_RESULTS);
   const totals = useMemo(
@@ -207,9 +218,6 @@ export default function CatalogManager({
       setCatalogs((current) =>
         current.filter((item) => item.id !== catalog.id),
       );
-      if (catalogId === catalog.id) {
-        setCatalogId("all");
-      }
       if (activeCatalogId === catalog.id) {
         onClearCalculation();
       }
@@ -377,7 +385,7 @@ export default function CatalogManager({
                 ))}
               </div>
 
-              <div className="catalogSearchBar">
+              <div className="catalogSearchBar single">
                 <label>
                   <Search size={17} />
                   <input
@@ -397,19 +405,6 @@ export default function CatalogManager({
                     </button>
                   )}
                 </label>
-                <select
-                  value={catalogId}
-                  onChange={(event) =>
-                    setCatalogId(event.target.value)
-                  }
-                >
-                  <option value="all">Tutti i cataloghi</option>
-                  {catalogs.map((catalog) => (
-                    <option value={catalog.id} key={catalog.id}>
-                      {catalog.name}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div className="catalogQuickSearches">
