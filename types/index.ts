@@ -1,5 +1,23 @@
-export type ModuleId = "dashboard" | "machines" | "manuals" | "tools" | "jobs" | "alarms" | "maintenance" | "notes" | "programs" | "materials";
-export type RecordModuleId = Exclude<ModuleId, "dashboard" | "machines" | "maintenance">;
+export type ModuleId =
+  | "dashboard"
+  | "machines"
+  | "manuals"
+  | "tools"
+  | "cutting"
+  | "jobs"
+  | "alarms"
+  | "maintenance"
+  | "notes"
+  | "programs"
+  | "materials";
+export type RecordModuleId =
+  | "manuals"
+  | "tools"
+  | "jobs"
+  | "alarms"
+  | "notes"
+  | "programs"
+  | "materials";
 export type ModuleState = "active" | "config" | "standby";
 export interface ModuleDefinition { id: ModuleId; label: string; description: string; icon: string; state: ModuleState; }
 export type ToolCategory =

@@ -3,7 +3,7 @@
 Applicazione professionale per organizzare dati, documentazione e attività di
 un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-Versione corrente: **2.1.0**.
+Versione corrente: **2.2.0**.
 
 ## Moduli disponibili
 
@@ -18,6 +18,15 @@ Versione corrente: **2.1.0**.
   - costo unitario, vita prevista, ore utilizzate e ultimo utilizzo;
   - filtri per categoria, stato e priorità;
   - avvisi automatici per scorta bassa e vita esaurita.
+- Parametri di taglio con:
+  - calcolo di giri mandrino, avanzamento e tempo stimato;
+  - modalità foratura, fresatura e tornitura;
+  - punte HSS e HM, frese HSS e HM e placchette;
+  - materiali ISO N, P, M, K, S e H;
+  - profili prudente, catalogo e produttivo;
+  - controllo dei limiti di giri e avanzamento della macchina;
+  - codice articolo e pagina sorgente del catalogo sempre visibili;
+  - valori iniziali verificati sul catalogo Hoffmann Group 56.
 - Lavorazioni.
 - Storico allarmi.
 - Knowledge Base.
@@ -79,6 +88,10 @@ npm run build
 ```
 
 La build controlla compilazione Next.js e validità TypeScript.
+
+Il calcolatore usa valori iniziali del costruttore. Prima della produzione è
+necessario verificare serraggio, sporgenza, refrigerazione, stabilità, potenza e
+limiti reali della macchina.
 
 ## Pubblicazione
 
