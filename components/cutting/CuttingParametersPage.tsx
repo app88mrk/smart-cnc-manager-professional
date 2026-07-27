@@ -27,6 +27,7 @@ import {
 } from "@/lib/cuttingParameters";
 import { Machine } from "@/types";
 import CatalogManager from "@/components/cutting/CatalogManager";
+import CatalogGuidedCalculator from "@/components/cutting/CatalogGuidedCalculator";
 import type {
   CatalogCalculationSelection,
   ImportedCatalog,
@@ -36,20 +37,16 @@ type CuttingParametersPageProps = {
   machines: Machine[];
 };
 
-type CalculationSource = "none" | "catalog" | "manual";
+type CalculationSource = "catalog" | "manual";
 
 export default function CuttingParametersPage({
   machines,
 }: CuttingParametersPageProps) {
   const [sourceMode, setSourceMode] =
-    useState<CalculationSource>("none");
+    useState<CalculationSource>("catalog");
   const [availableCatalogs, setAvailableCatalogs] = useState<
     ImportedCatalog[]
   >([]);
-  const [selectedCatalogId, setSelectedCatalogId] = useState("");
-  const selectedCatalog = availableCatalogs.find(
-    (catalog) => catalog.id === selectedCatalogId,
-  );
   const [operation, setOperation] =
     useState<CuttingOperation>("drilling");
   const operationPresets = useMemo(
@@ -121,20 +118,6 @@ export default function CuttingParametersPage({
       ),
     );
   }, [catalogSelection, profile]);
-
-  useEffect(() => {
-    if (
-      selectedCatalogId &&
-      !availableCatalogs.some(
-        (catalog) => catalog.id === selectedCatalogId,
-      )
-    ) {
-      setSelectedCatalogId("");
-      setCatalogSelection(null);
-      setSourceMode("none");
-      resetWorkData();
-    }
-  }, [availableCatalogs, selectedCatalogId]);
 
   const result = useMemo(() => {
     const diameterValue = positiveNumber(diameter);
@@ -209,15 +192,13 @@ export default function CuttingParametersPage({
     setAe("");
   }
 
-  function selectCalculationCatalog(catalogId: string) {
-    setSelectedCatalogId(catalogId);
+  function selectCatalogCalculation() {
     setCatalogSelection(null);
-    setSourceMode(catalogId ? "catalog" : "none");
+    setSourceMode("catalog");
     resetWorkData();
   }
 
   function selectManualCalculation() {
-    setSelectedCatalogId("");
     setCatalogSelection(null);
     setSourceMode("manual");
     resetWorkData();
@@ -233,7 +214,6 @@ export default function CuttingParametersPage({
   ) {
     resetWorkData();
     setSourceMode("catalog");
-    setSelectedCatalogId(selection.catalogId);
     setCatalogSelection(selection);
     setOperation(selection.operation);
 
@@ -279,11 +259,11 @@ export default function CuttingParametersPage({
     <>
       <div className="pageHead cuttingHead">
         <div>
-          <p>STEP 15 · SORGENTE DATI DI LAVORAZIONE</p>
+          <p>STEP 16 · CALCOLO GUIDATO</p>
           <h1>Parametri di taglio</h1>
           <span>
-            Scegli un catalogo PDF caricato oppure inserisci
-            manualmente tutti i valori.
+            Calcola dai cataloghi che hai caricato oppure inserisci
+            ogni parametro manualmente.
           </span>
         </div>
 
@@ -295,29 +275,22 @@ export default function CuttingParametersPage({
                 ? catalogSelection.catalogName
                 : sourceMode === "manual"
                   ? "Calcolo manuale"
-                  : selectedCatalog?.name || "Scegli la sorgente"}
+                  : `${availableCatalogs.length} ${
+                      availableCatalogs.length === 1
+                        ? "catalogo disponibile"
+                        : "cataloghi disponibili"
+                    }`}
             </b>
             <span>
               {catalogSelection
                 ? `Pagina ${catalogSelection.page} in uso`
                 : sourceMode === "manual"
                   ? "Dati inseriti a mano"
-                  : selectedCatalog
-                    ? "Catalogo selezionato"
-                    : "Calcolo inizialmente azzerato"}
+                  : "Ricerca guidata nei PDF caricati"}
             </span>
           </div>
         </div>
       </div>
-
-      <CatalogManager
-        activeCatalogId={catalogSelection?.catalogId}
-        activePageId={catalogSelection?.pageId}
-        catalogFilterId={selectedCatalogId}
-        onCatalogsChange={setAvailableCatalogs}
-        onClearCalculation={clearCatalogCalculation}
-        onUseForCalculation={useCatalogSelection}
-      />
 
       <section className="cuttingLayout" id="cutting-calculator">
         <div className="panel cuttingInputs">
@@ -330,72 +303,54 @@ export default function CuttingParametersPage({
                   ? "Valori ricavati dal catalogo caricato."
                   : sourceMode === "manual"
                     ? "Inserisci manualmente i dati richiesti."
-                    : sourceMode === "catalog"
-                      ? "Scegli una pagina e applica i suoi parametri."
-                      : "Prima scegli la sorgente dei dati."}
+                    : "Trova utensile e parametri nei tuoi PDF."}
               </span>
             </div>
           </div>
 
-          <div className="calculationSourceChooser">
-            <label
-              className={`calculationSourceCard catalog ${
+          <div
+            className="calculationModeTabs"
+            aria-label="Modalità di calcolo"
+          >
+            <button
+              type="button"
+              className={`calculationModeButton ${
                 sourceMode === "catalog" ? "active" : ""
               }`}
+              onClick={selectCatalogCalculation}
             >
-              <span>
+              <i>
                 <BookOpen size={17} />
-                <b>Catalogo caricato</b>
+              </i>
+              <span>
+                <b>Da catalogo</b>
+                <small>Usa i PDF caricati da te</small>
               </span>
-              <select
-                aria-label="Catalogo per il calcolo"
-                value={selectedCatalogId}
-                disabled={!availableCatalogs.length}
-                onChange={(event) =>
-                  selectCalculationCatalog(event.target.value)
-                }
-              >
-                <option value="">
-                  {availableCatalogs.length
-                    ? "Scegli un catalogo…"
-                    : "Nessun catalogo caricato"}
-                </option>
-                {availableCatalogs.map((catalog) => (
-                  <option value={catalog.id} key={catalog.id}>
-                    {catalog.name}
-                  </option>
-                ))}
-              </select>
-              <small>
-                Usa i parametri estratti da uno dei PDF in archivio.
-              </small>
-            </label>
+            </button>
 
             <button
-              className={`calculationSourceCard manual ${
+              className={`calculationModeButton ${
                 sourceMode === "manual" ? "active" : ""
               }`}
               type="button"
               onClick={selectManualCalculation}
             >
-              <span>
+              <i>
                 <Calculator size={17} />
+              </i>
+              <span>
                 <b>Calcolo manuale</b>
+                <small>Inserisci tutti i dati a mano</small>
               </span>
-              <small>
-                Azzera il calcolo e inserisci tutti i dati a mano.
-              </small>
             </button>
           </div>
 
-          {sourceMode === "catalog" && !catalogSelection && (
-            <div className="catalogSelectionHint">
-              <BookOpen size={16} />
-              <span>
-                Cerca il codice nell’archivio qui sopra, seleziona la
-                riga corretta e premi “Usa questi dati nel calcolo”.
-              </span>
-            </div>
+          {sourceMode === "catalog" && (
+            <CatalogGuidedCalculator
+              activeSelection={catalogSelection}
+              catalogs={availableCatalogs}
+              onApply={useCatalogSelection}
+            />
           )}
 
           {catalogSelection && (
@@ -417,27 +372,40 @@ export default function CuttingParametersPage({
             </div>
           )}
 
-          <div className="operationTabs" role="tablist">
-            {(
-              Object.keys(operationLabels) as CuttingOperation[]
-            ).map((item) => (
-              <button
-                key={item}
-                className={operation === item ? "active" : ""}
-                disabled={sourceMode !== "manual"}
-                onClick={() => {
-                  setOperation(item);
-                  setInsertShape("");
-                  setFeed("");
-                  setTeeth("");
-                }}
-              >
-                {operationLabels[item]}
-              </button>
-            ))}
-          </div>
+          {sourceMode === "manual" && (
+            <>
+              <div className="manualCalculationIntro">
+                <Calculator size={17} />
+                <span>
+                  Nessun dato del catalogo viene applicato. Scegli la
+                  lavorazione e compila i valori richiesti.
+                </span>
+              </div>
+              <div className="operationTabs" role="tablist">
+                {(
+                  Object.keys(operationLabels) as CuttingOperation[]
+                ).map((item) => (
+                  <button
+                    type="button"
+                    key={item}
+                    className={operation === item ? "active" : ""}
+                    onClick={() => {
+                      setOperation(item);
+                      setInsertShape("");
+                      setFeed("");
+                      setTeeth("");
+                    }}
+                  >
+                    {operationLabels[item]}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
-          <div className="cuttingFormGrid">
+          {calculationEnabled ? (
+            <>
+              <div className="cuttingFormGrid">
             {operation === "turning" && (
               <label className="full">
                 <span>Forma placchetta</span>
@@ -579,61 +547,71 @@ export default function CuttingParametersPage({
                 onChange={(event) => setAe(event.target.value)}
               />
             </label>
-          </div>
-
-          <div className="machineLimits">
-            <div className="cuttingSectionTitle compact">
-              <Gauge size={18} />
-              <div>
-                <b>Limiti macchina</b>
-                <span>Facoltativi, usati per gli avvisi.</span>
               </div>
-            </div>
 
-            <div className="cuttingFormGrid">
-              <label className="full">
-                <span>Macchina</span>
-                <select
-                  value={machineId}
-                  disabled={!calculationEnabled}
-                  onChange={(event) =>
-                    selectMachine(event.target.value)
-                  }
-                >
-                  <option value="">Nessuna macchina selezionata</option>
-                  {machines.map((machine) => (
-                    <option key={machine.id} value={machine.id}>
-                      {machine.brand} {machine.model}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Giri massimi (rpm)</span>
-                <input
-                  inputMode="numeric"
-                  placeholder="es. 12000"
-                  value={maxRpm}
-                  disabled={!calculationEnabled}
-                  onChange={(event) =>
-                    setMaxRpm(event.target.value)
-                  }
-                />
-              </label>
-              <label>
-                <span>Avanzamento massimo (mm/min)</span>
-                <input
-                  inputMode="numeric"
-                  placeholder="es. 8000"
-                  value={maxFeed}
-                  disabled={!calculationEnabled}
-                  onChange={(event) =>
-                    setMaxFeed(event.target.value)
-                  }
-                />
-              </label>
+              <div className="machineLimits">
+                <div className="cuttingSectionTitle compact">
+                  <Gauge size={18} />
+                  <div>
+                    <b>Limiti macchina</b>
+                    <span>Facoltativi, usati per gli avvisi.</span>
+                  </div>
+                </div>
+
+                <div className="cuttingFormGrid">
+                  <label className="full">
+                    <span>Macchina</span>
+                    <select
+                      value={machineId}
+                      onChange={(event) =>
+                        selectMachine(event.target.value)
+                      }
+                    >
+                      <option value="">
+                        Nessuna macchina selezionata
+                      </option>
+                      {machines.map((machine) => (
+                        <option key={machine.id} value={machine.id}>
+                          {machine.brand} {machine.model}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Giri massimi (rpm)</span>
+                    <input
+                      inputMode="numeric"
+                      placeholder="es. 12000"
+                      value={maxRpm}
+                      onChange={(event) =>
+                        setMaxRpm(event.target.value)
+                      }
+                    />
+                  </label>
+                  <label>
+                    <span>Avanzamento massimo (mm/min)</span>
+                    <input
+                      inputMode="numeric"
+                      placeholder="es. 8000"
+                      value={maxFeed}
+                      onChange={(event) =>
+                        setMaxFeed(event.target.value)
+                      }
+                    />
+                  </label>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="catalogDataPending">
+              <BookOpen size={18} />
+              <span>
+                Seleziona una scheda del catalogo e premi “Calcola con
+                questi dati”. Poi inserirai solo diametro, lunghezza e
+                gli eventuali limiti della macchina.
+              </span>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="cuttingResults">
@@ -790,14 +768,14 @@ export default function CuttingParametersPage({
             <section className="panel sourcePanel waitingSourcePanel">
               <div className="sourceTop">
                 <div>
-                  <span>Sorgente non selezionata</span>
-                  <h2>Calcolo azzerato</h2>
+                  <span>Calcolo da catalogo</span>
+                  <h2>Scegli una scheda PDF</h2>
                 </div>
-                <b>0</b>
+                <b>PDF</b>
               </div>
               <p>
-                Scegli un catalogo nel riquadro blu oppure attiva il
-                calcolo manuale nel riquadro nero.
+                Usa la ricerca guidata per scegliere lavorazione,
+                materiale e utensile dai cataloghi caricati.
               </p>
             </section>
           )}
@@ -809,11 +787,21 @@ export default function CuttingParametersPage({
                 ? "Valori estratti dal PDF: verifica che Vc, avanzamento e profondità appartengano alla stessa colonna di materiale, grado e geometria prima della produzione."
                 : sourceMode === "manual"
                   ? "Valori manuali: confrontali con il catalogo del costruttore e parti con condizioni prudenti prima della produzione."
-                  : "Il calcolo è azzerato. Seleziona prima un catalogo oppure il calcolo manuale."}
+                  : "Seleziona una scheda nella ricerca guidata. Il calcolo userà soltanto i valori presenti nei cataloghi caricati da te."}
             </span>
           </div>
         </div>
       </section>
+
+      <CatalogManager
+        activeCatalogId={catalogSelection?.catalogId}
+        activePageId={catalogSelection?.pageId}
+        enableCalculation={false}
+        initiallyExpanded={false}
+        onCatalogsChange={setAvailableCatalogs}
+        onClearCalculation={clearCatalogCalculation}
+        onUseForCalculation={useCatalogSelection}
+      />
     </>
   );
 }

@@ -53,6 +53,8 @@ type CatalogManagerProps = {
   activeCatalogId?: string;
   activePageId?: string;
   catalogFilterId?: string;
+  enableCalculation?: boolean;
+  initiallyExpanded?: boolean;
   onCatalogsChange: (catalogs: ImportedCatalog[]) => void;
   onClearCalculation: () => void;
   onUseForCalculation: (
@@ -64,6 +66,8 @@ export default function CatalogManager({
   activeCatalogId,
   activePageId,
   catalogFilterId,
+  enableCalculation = true,
+  initiallyExpanded = true,
   onCatalogsChange,
   onClearCalculation,
   onUseForCalculation,
@@ -75,7 +79,7 @@ export default function CatalogManager({
   );
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(initiallyExpanded);
   const [progress, setProgress] =
     useState<CatalogImportProgress | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -498,11 +502,13 @@ export default function CatalogManager({
                       colonna associata a materiale, grado e geometria.
                     </small>
 
-                    <CatalogCalculationPicker
-                      active={activePageId === page.id}
-                      page={page}
-                      onUseForCalculation={onUseForCalculation}
-                    />
+                    {enableCalculation && (
+                      <CatalogCalculationPicker
+                        active={activePageId === page.id}
+                        page={page}
+                        onUseForCalculation={onUseForCalculation}
+                      />
+                    )}
                   </article>
                 ))}
               </div>
