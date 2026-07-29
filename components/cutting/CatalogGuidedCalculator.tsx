@@ -108,7 +108,7 @@ export default function CatalogGuidedCalculator({
       .filter(
         (tool) =>
           diameterQuery === null ||
-          sameDimension(tool.diameter, diameterQuery),
+          toolMatchesDiameter(tool, diameterQuery),
       )
       .filter((tool) =>
         tokens.every((token) => tool.searchText.includes(token)),
@@ -213,7 +213,10 @@ export default function CatalogGuidedCalculator({
       ae: parameterSet.ae,
       aeUnit: parameterSet.aeUnit,
       profile: selectedProfile,
-      diameter: tool.diameter,
+      diameter: preferredToolDiameter(tool),
+      diameterMin: tool.diameterMin,
+      diameterMax: tool.diameterMax,
+      diameters: tool.diameters,
       radius: tool.radius,
       teeth: tool.teeth,
       toolMaterial: tool.toolMaterial,
@@ -393,8 +396,8 @@ export default function CatalogGuidedCalculator({
                   {selectedTool.toolMaterial && (
                     <span>{selectedTool.toolMaterial}</span>
                   )}
-                  {selectedTool.diameter && (
-                    <span>Ø {selectedTool.diameter} mm</span>
+                  {toolDiameterLabel(selectedTool) && (
+                    <span>{toolDiameterLabel(selectedTool)}</span>
                   )}
                   {selectedTool.radius && (
                     <span>R {selectedTool.radius} mm</span>
@@ -516,7 +519,7 @@ function toolOptionLabel(tool: CatalogToolRecord) {
     tool.article,
     tool.family && tool.family !== tool.article ? tool.family : "",
     tool.toolMaterial,
-    tool.diameter ? `Ø ${tool.diameter}` : "",
+    toolDiameterLabel(tool),
     tool.radius ? `R ${tool.radius}` : "",
     tool.teeth ? `Z ${tool.teeth}` : "",
     `pag. ${tool.page}`,
@@ -562,6 +565,74 @@ function dimensionQuery(
 function sameDimension(value: string, expected: number) {
   const parsed = Number(value.replace(",", "."));
   return Number.isFinite(parsed) && Math.abs(parsed - expected) < 0.001;
+}
+
+function toolMatchesDiameter(tool: CatalogToolRecord, expected: number) {
+  if (sameDimension(tool.diameter, expected)) {
+    return true;
+  }
+
+  if (
+    tool.diameters?.some((value) => sameDimension(value, expected))
+  ) {
+    return true;
+  }
+
+  const minimum = catalogNumber(tool.diameterMin);
+  const maximum = catalogNumber(tool.diameterMax);
+  return (
+    minimum !== null &&
+    maximum !== null &&
+    expected >= minimum &&
+    expected <= maximum
+  );
+}
+
+function toolDiameterLabel(tool: CatalogToolRecord) {
+  const exact = formatCatalogNumber(tool.diameter);
+  if (exact) {
+    return `Ø ${exact} mm`;
+  }
+
+  const minimum = formatCatalogNumber(tool.diameterMin);
+  const maximum = formatCatalogNumber(tool.diameterMax);
+  if (!minimum && !maximum) {
+    return "";
+  }
+
+  if (!maximum || minimum === maximum) {
+    return `Ø ${minimum || maximum} mm`;
+  }
+
+  return `Ø ${minimum}–${maximum} mm`;
+}
+
+function preferredToolDiameter(tool: CatalogToolRecord) {
+  return (
+    formatCatalogNumber(tool.diameter) ||
+    formatCatalogNumber(tool.diameterMin) ||
+    formatCatalogNumber(tool.diameters?.[0])
+  );
+}
+
+function catalogNumber(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function formatCatalogNumber(value?: string) {
+  const parsed = catalogNumber(value);
+  if (parsed === null) {
+    return "";
+  }
+
+  return new Intl.NumberFormat("it-IT", {
+    maximumFractionDigits: 4,
+  }).format(parsed);
 }
 
 function foldText(value: string) {
