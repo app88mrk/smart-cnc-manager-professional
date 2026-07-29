@@ -127,10 +127,15 @@ export default function CatalogGuidedCalculator({
         <div>
           <b>Carica il primo catalogo PDF</b>
           <span>
-            Premi “Carica catalogo PDF” nell’archivio in fondo alla
-            pagina. Dopo l’indicizzazione compariranno qui gli utensili
+            Dopo l’indicizzazione compariranno qui gli utensili
             utilizzabili nel calcolo.
           </span>
+          <label
+            className="guidedCatalogUpload"
+            htmlFor="catalog-pdf-input"
+          >
+            Carica catalogo PDF
+          </label>
         </div>
       </div>
     );

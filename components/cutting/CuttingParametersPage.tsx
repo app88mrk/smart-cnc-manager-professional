@@ -166,6 +166,11 @@ export default function CuttingParametersPage({
     teeth,
     vc,
   ]);
+  const calculationReady =
+    positiveNumber(diameter) > 0 &&
+    positiveNumber(vc) > 0 &&
+    positiveNumber(feed) > 0 &&
+    (operation !== "milling" || positiveNumber(teeth) > 0);
 
   function selectMachine(value: string) {
     setMachineId(value);
@@ -627,82 +632,98 @@ export default function CuttingParametersPage({
               </div>
             </div>
 
-            <div className="resultGrid">
-              <ResultCard
-                icon={<RotateCw size={19} />}
-                label="Mandrino"
-                value={`${formatCuttingNumber(
-                  Math.round(result.rpm),
-                  0,
-                )} rpm`}
-                warning={result.rpmLimited}
-              />
-              <ResultCard
-                icon={<Ruler size={19} />}
-                label="Avanzamento"
-                value={`${formatCuttingNumber(
-                  Math.round(result.machineFeed),
-                  0,
-                )} mm/min`}
-                warning={result.feedLimited}
-              />
-              <ResultCard
-                icon={<Timer size={19} />}
-                label="Tempo stimato"
-                value={formatTime(result.timeMinutes)}
-              />
-            </div>
+            {calculationReady ? (
+              <>
+                <div className="resultGrid">
+                  <ResultCard
+                    icon={<RotateCw size={19} />}
+                    label="Mandrino"
+                    value={`${formatCuttingNumber(
+                      Math.round(result.rpm),
+                      0,
+                    )} rpm`}
+                    warning={result.rpmLimited}
+                  />
+                  <ResultCard
+                    icon={<Ruler size={19} />}
+                    label="Avanzamento"
+                    value={`${formatCuttingNumber(
+                      Math.round(result.machineFeed),
+                      0,
+                    )} mm/min`}
+                    warning={result.feedLimited}
+                  />
+                  <ResultCard
+                    icon={<Timer size={19} />}
+                    label="Tempo stimato"
+                    value={formatTime(result.timeMinutes)}
+                  />
+                </div>
 
-            {(result.rpmLimited || result.feedLimited) && (
-              <div className="limitWarning">
-                <AlertTriangle size={18} />
+                {(result.rpmLimited || result.feedLimited) && (
+                  <div className="limitWarning">
+                    <AlertTriangle size={18} />
+                    <span>
+                      Il risultato è stato limitato ai valori massimi
+                      della macchina. Verifica che il nuovo
+                      avanzamento mantenga un carico truciolo adatto.
+                    </span>
+                  </div>
+                )}
+
+                <dl className="calculationDetails">
+                  <div>
+                    <dt>Formula giri</dt>
+                    <dd>n = (1.000 × Vc) / (π × D)</dd>
+                  </div>
+                  <div>
+                    <dt>Formula avanzamento</dt>
+                    <dd>
+                      {effectiveFeedMode === "per-tooth"
+                        ? "Vf = n × Z × fz"
+                        : "Vf = n × f"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>
+                      {catalogSelection
+                        ? "Intervallo catalogo Vc"
+                        : "Vc utilizzata"}
+                    </dt>
+                    <dd>
+                      {catalogSelection
+                        ? `${catalogSelection.vc} m/min`
+                        : vc
+                          ? `${vc} m/min`
+                          : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Profondità ap</dt>
+                    <dd>{ap ? `${ap} mm` : "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Impegno ae</dt>
+                    <dd>{ae ? `${ae} mm` : "—"}</dd>
+                  </div>
+                </dl>
+              </>
+            ) : (
+              <div className="resultAwaiting">
+                <Calculator size={24} />
+                <b>Il risultato apparirà qui</b>
                 <span>
-                  Il risultato è stato limitato ai valori massimi
-                  della macchina. Verifica che il nuovo avanzamento
-                  mantenga un carico truciolo adatto.
+                  {sourceMode === "catalog" && !catalogSelection
+                    ? "Carica o scegli un utensile dal catalogo."
+                    : operation === "milling" && !teeth
+                      ? "Inserisci diametro, numero di taglienti, Vc e fz."
+                      : "Inserisci almeno diametro, Vc e avanzamento."}
                 </span>
               </div>
             )}
-
-            <dl className="calculationDetails">
-              <div>
-                <dt>Formula giri</dt>
-                <dd>n = (1.000 × Vc) / (π × D)</dd>
-              </div>
-              <div>
-                <dt>Formula avanzamento</dt>
-                <dd>
-                  {effectiveFeedMode === "per-tooth"
-                    ? "Vf = n × Z × fz"
-                    : "Vf = n × f"}
-                </dd>
-              </div>
-              <div>
-                <dt>
-                  {catalogSelection
-                    ? "Intervallo catalogo Vc"
-                    : "Vc utilizzata"}
-                </dt>
-                <dd>
-                  {catalogSelection
-                    ? `${catalogSelection.vc} m/min`
-                    : vc
-                      ? `${vc} m/min`
-                      : "—"}
-                </dd>
-              </div>
-              <div>
-                <dt>Profondità ap</dt>
-                <dd>{ap ? `${ap} mm` : "—"}</dd>
-              </div>
-              <div>
-                <dt>Impegno ae</dt>
-                <dd>{ae ? `${ae} mm` : "—"}</dd>
-              </div>
-            </dl>
           </section>
 
-          {catalogSelection ? (
+          {catalogSelection && (
             <section className="panel sourcePanel catalogSourcePanel">
               <div className="sourceTop">
                 <div>
@@ -735,51 +756,6 @@ export default function CuttingParametersPage({
                 Fonte selezionata dall’archivio cataloghi. I valori
                 restano modificabili nei campi del calcolatore.
               </small>
-            </section>
-          ) : sourceMode === "manual" ? (
-            <section className="panel sourcePanel manualSourcePanel">
-              <div className="sourceTop">
-                <div>
-                  <span>Inserimento diretto</span>
-                  <h2>Calcolo manuale</h2>
-                </div>
-                <b>MANUALE</b>
-              </div>
-
-              <div className="sourceTags">
-                <span>{operationLabels[operation]}</span>
-                {insertShape && <span>Forma {insertShape}</span>}
-                {vc && <span>Vc {vc} m/min</span>}
-                {feed && (
-                  <span>
-                    {effectiveFeedMode === "per-tooth" ? "fz" : "f"}{" "}
-                    {feed}
-                  </span>
-                )}
-              </div>
-
-              <p>
-                Nessun valore di catalogo viene applicato. Tutti i
-                dati di lavorazione sono quelli inseriti a mano.
-              </p>
-              <small>
-                Controlla i valori con la documentazione del
-                costruttore prima di usarli sulla macchina.
-              </small>
-            </section>
-          ) : (
-            <section className="panel sourcePanel waitingSourcePanel">
-              <div className="sourceTop">
-                <div>
-                  <span>Calcolo da catalogo</span>
-                  <h2>Scegli una scheda PDF</h2>
-                </div>
-                <b>PDF</b>
-              </div>
-              <p>
-                Usa la ricerca guidata per scegliere lavorazione,
-                materiale e utensile dai cataloghi caricati.
-              </p>
             </section>
           )}
 

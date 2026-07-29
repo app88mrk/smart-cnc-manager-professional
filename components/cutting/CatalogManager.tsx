@@ -281,6 +281,7 @@ export default function CatalogManager({
           </button>
           <input
             ref={fileInput}
+            id="catalog-pdf-input"
             className="catalogFileInput"
             type="file"
             accept=".pdf,application/pdf"
