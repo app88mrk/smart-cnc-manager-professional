@@ -14,138 +14,191 @@ import {
   Gauge,
   RotateCw,
   Ruler,
+  Search,
   Timer,
 } from "lucide-react";
 
+import CatalogManager from "@/components/cutting/CatalogManager";
 import {
-  CuttingOperation,
-  CuttingProfile,
-  cuttingPresets,
+  catalogToolsFromCatalogs,
+  type CatalogParameterSet,
+  type CatalogToolRecord,
+  type ImportedCatalog,
+} from "@/lib/catalogImport";
+import {
+  type CuttingOperation,
+  type CuttingProfile,
   formatCuttingNumber,
   operationLabels,
   profileLabels,
 } from "@/lib/cuttingParameters";
-import { Machine } from "@/types";
-import CatalogManager from "@/components/cutting/CatalogManager";
-import CatalogGuidedCalculator from "@/components/cutting/CatalogGuidedCalculator";
-import type {
-  CatalogCalculationSelection,
-  ImportedCatalog,
-} from "@/lib/catalogImport";
+import type { Machine } from "@/types";
 
 type CuttingParametersPageProps = {
   machines: Machine[];
 };
 
-type CalculationSource = "catalog" | "manual";
+const materialNames: Record<string, string> = {
+  P: "P · Acciai",
+  M: "M · Acciai inossidabili",
+  K: "K · Ghise",
+  N: "N · Materiali non ferrosi",
+  S: "S · Superleghe e titanio",
+  H: "H · Materiali temprati",
+};
 
 export default function CuttingParametersPage({
   machines,
 }: CuttingParametersPageProps) {
-  const [sourceMode, setSourceMode] =
-    useState<CalculationSource>("catalog");
-  const [availableCatalogs, setAvailableCatalogs] = useState<
-    ImportedCatalog[]
-  >([]);
+  const [catalogs, setCatalogs] = useState<ImportedCatalog[]>([]);
+  const [catalogId, setCatalogId] = useState("all");
   const [operation, setOperation] =
     useState<CuttingOperation>("drilling");
-  const operationPresets = useMemo(
-    () =>
-      cuttingPresets.filter(
-        (preset) => preset.operation === operation,
-      ),
-    [operation],
-  );
-  const turningShapes = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          operationPresets
-            .map((preset) => preset.insertShape)
-            .filter((shape): shape is string => Boolean(shape)),
-        ),
-      ),
-    [operationPresets],
-  );
-  const [insertShape, setInsertShape] = useState("");
+  const [query, setQuery] = useState("");
+  const [toolId, setToolId] = useState("");
+  const [materialId, setMaterialId] = useState("");
+  const [parameterSetId, setParameterSetId] = useState("");
   const [profile, setProfile] =
     useState<CuttingProfile>("conservative");
-  const [diameter, setDiameter] = useState("");
-  const [teeth, setTeeth] = useState("");
-  const [cutLength, setCutLength] = useState("");
+  const [diameter, setDiameter] = useState("10");
+  const [teeth, setTeeth] = useState("2");
+  const [cutLength, setCutLength] = useState("50");
   const [vc, setVc] = useState("");
   const [feed, setFeed] = useState("");
   const [ap, setAp] = useState("");
   const [ae, setAe] = useState("");
-  const [catalogSelection, setCatalogSelection] =
-    useState<CatalogCalculationSelection | null>(null);
   const [machineId, setMachineId] = useState("");
   const [maxRpm, setMaxRpm] = useState("");
   const [maxFeed, setMaxFeed] = useState("");
 
-  const effectiveFeedMode = catalogSelection
-    ? catalogSelection.feedKind === "fz"
-      ? "per-tooth"
-      : "per-revolution"
-    : operation === "milling"
-      ? "per-tooth"
-      : "per-revolution";
-  const calculationEnabled =
-    sourceMode === "manual" || Boolean(catalogSelection);
-  const apUnit =
-    sourceMode === "catalog" && catalogSelection?.apUnit
-      ? catalogSelection.apUnit
-      : "mm";
-  const aeUnit =
-    sourceMode === "catalog" && catalogSelection?.aeUnit
-      ? catalogSelection.aeUnit
-      : "mm";
+  const allTools = useMemo(
+    () => catalogToolsFromCatalogs(catalogs),
+    [catalogs],
+  );
+  const operationTools = useMemo(
+    () =>
+      allTools.filter(
+        (tool) =>
+          tool.operation === operation &&
+          (catalogId === "all" || tool.catalogId === catalogId),
+      ),
+    [allTools, catalogId, operation],
+  );
+  const visibleTools = useMemo(() => {
+    const tokens = foldText(query).split(/\s+/).filter(Boolean);
+
+    return operationTools
+      .filter((tool) =>
+        tokens.every((token) => tool.searchText.includes(token)),
+      )
+      .sort(
+        (left, right) =>
+          left.article.localeCompare(right.article, "it", {
+            numeric: true,
+          }) || left.page - right.page,
+      );
+  }, [operationTools, query]);
+
+  const selectedTool =
+    visibleTools.find((tool) => tool.id === toolId) ||
+    visibleTools[0] ||
+    null;
+  const materialOptions = useMemo(
+    () => materialsForTool(selectedTool),
+    [selectedTool],
+  );
+  const parameterSets = useMemo(
+    () =>
+      selectedTool
+        ? parameterSetsForMaterial(selectedTool, materialId)
+        : [],
+    [materialId, selectedTool],
+  );
+  const selectedParameterSet =
+    parameterSets.find((set) => set.id === parameterSetId) ||
+    parameterSets[0] ||
+    null;
 
   useEffect(() => {
-    if (!catalogSelection) {
+    if (!visibleTools.some((tool) => tool.id === toolId)) {
+      setToolId(visibleTools[0]?.id || "");
+    }
+  }, [toolId, visibleTools]);
+
+  useEffect(() => {
+    if (!materialOptions.includes(materialId)) {
+      setMaterialId(materialOptions[0] || "");
+    }
+  }, [materialId, materialOptions]);
+
+  useEffect(() => {
+    if (
+      !parameterSets.some((parameterSet) => parameterSet.id === parameterSetId)
+    ) {
+      setParameterSetId(parameterSets[0]?.id || "");
+    }
+  }, [parameterSetId, parameterSets]);
+
+  useEffect(() => {
+    if (!selectedTool) {
+      return;
+    }
+
+    if (selectedTool.diameter) {
+      setDiameter(selectedTool.diameter);
+    }
+    if (selectedTool.teeth) {
+      setTeeth(selectedTool.teeth);
+    }
+  }, [selectedTool]);
+
+  useEffect(() => {
+    if (!selectedParameterSet) {
+      setVc("");
+      setFeed("");
+      setAp("");
+      setAe("");
       return;
     }
 
     setVc(
-      String(
-        roundValue(
-          valueForCatalogProfile(catalogSelection.vc, profile),
-          2,
-        ),
+      formatEditableValue(
+        valueForCatalogProfile(selectedParameterSet.vc, profile),
+        2,
       ),
     );
     setFeed(
-      String(
-        roundValue(
-          valueForCatalogProfile(
-            catalogSelection.feed,
-            profile,
-          ),
-          3,
-        ),
+      formatEditableValue(
+        valueForCatalogProfile(selectedParameterSet.feed, profile),
+        3,
       ),
     );
     setAp(
-      catalogSelection.ap
-        ? String(
-            roundValue(
-              valueForCatalogProfile(catalogSelection.ap, profile),
-              3,
-            ),
+      selectedParameterSet.ap
+        ? formatEditableValue(
+            valueForCatalogProfile(selectedParameterSet.ap, profile),
+            3,
           )
         : "",
     );
     setAe(
-      catalogSelection.ae
-        ? String(
-            roundValue(
-              valueForCatalogProfile(catalogSelection.ae, profile),
-              3,
-            ),
+      selectedParameterSet.ae
+        ? formatEditableValue(
+            valueForCatalogProfile(selectedParameterSet.ae, profile),
+            3,
           )
         : "",
     );
-  }, [catalogSelection, profile]);
+  }, [profile, selectedParameterSet]);
+
+  const feedMode =
+    selectedParameterSet?.feedKind === "fz"
+      ? "per-tooth"
+      : "per-revolution";
+  const apUnit = selectedParameterSet?.apUnit || "mm";
+  const aeUnit = selectedParameterSet?.aeUnit || "mm";
+  const sourcePage =
+    selectedParameterSet?.sourcePage || selectedTool?.page || 0;
 
   const result = useMemo(() => {
     const diameterValue = positiveNumber(diameter);
@@ -164,7 +217,7 @@ export default function CuttingParametersPage({
         ? Math.min(requestedRpm, rpmLimit)
         : requestedRpm;
     const requestedFeed =
-      effectiveFeedMode === "per-tooth"
+      feedMode === "per-tooth"
         ? rpm * teethValue * feedValue
         : rpm * feedValue;
     const machineFeed =
@@ -177,24 +230,23 @@ export default function CuttingParametersPage({
       rpm,
       machineFeed,
       timeMinutes:
-        machineFeed > 0 && length > 0
-          ? length / machineFeed
-          : 0,
+        machineFeed > 0 && length > 0 ? length / machineFeed : 0,
       rpmLimited: rpmLimit > 0 && requestedRpm > rpmLimit,
-      feedLimited:
-        feedLimit > 0 && requestedFeed > feedLimit,
+      feedLimited: feedLimit > 0 && requestedFeed > feedLimit,
     };
   }, [
     cutLength,
     diameter,
     feed,
+    feedMode,
     maxFeed,
     maxRpm,
-    effectiveFeedMode,
     teeth,
     vc,
   ]);
+
   const calculationReady =
+    Boolean(selectedTool && selectedParameterSet) &&
     positiveNumber(diameter) > 0 &&
     positiveNumber(vc) > 0 &&
     positiveNumber(feed) > 0 &&
@@ -212,144 +264,41 @@ export default function CuttingParametersPage({
     }
   }
 
-  function resetWorkData() {
-    setOperation("drilling");
-    setInsertShape("");
-    setProfile("conservative");
-    setDiameter("");
-    setTeeth("");
-    setCutLength("");
-    setVc("");
-    setFeed("");
-    setAp("");
-    setAe("");
+  function changeOperation(nextOperation: CuttingOperation) {
+    setOperation(nextOperation);
+    setQuery("");
+    setToolId("");
+    setMaterialId("");
+    setParameterSetId("");
   }
 
-  function selectCatalogCalculation() {
-    setCatalogSelection(null);
-    setSourceMode("catalog");
-    resetWorkData();
-  }
-
-  function selectManualCalculation() {
-    setCatalogSelection(null);
-    setSourceMode("manual");
-    resetWorkData();
-  }
-
-  function clearCatalogCalculation() {
-    setCatalogSelection(null);
-    resetWorkData();
-  }
-
-  function useCatalogSelection(
-    selection: CatalogCalculationSelection,
-  ) {
-    const selectionProfile =
-      selection.profile || "conservative";
-    resetWorkData();
-    setSourceMode("catalog");
-    setCatalogSelection(selection);
-    setOperation(selection.operation);
-    setProfile(selectionProfile);
-
-    if (selection.operation === "turning") {
-      const matchingShape = cuttingPresets.find(
-        (item) =>
-          item.operation === "turning" &&
-          item.insertShape === selection.family,
-      )?.insertShape;
-
-      if (matchingShape) {
-        setInsertShape(matchingShape);
-      }
-    }
-
-    setVc(
-      String(
-        roundValue(
-          valueForCatalogProfile(selection.vc, selectionProfile),
-          2,
-        ),
-      ),
-    );
-    setFeed(
-      String(
-        roundValue(
-          valueForCatalogProfile(selection.feed, selectionProfile),
-          3,
-        ),
-      ),
-    );
-    setAp(
-      selection.ap
-        ? String(
-            roundValue(
-              valueForCatalogProfile(selection.ap, selectionProfile),
-              3,
-            ),
-          )
-        : "",
-    );
-    setAe(
-      selection.ae
-        ? String(
-            roundValue(
-              valueForCatalogProfile(selection.ae, selectionProfile),
-              3,
-            ),
-          )
-        : "",
-    );
-    if (
-      selection.operation !== "turning" &&
-      selection.diameter
-    ) {
-      setDiameter(selection.diameter);
-    }
-    if (selection.operation === "milling" && selection.teeth) {
-      setTeeth(selection.teeth);
-    }
-
-    requestAnimationFrame(() => {
-      document
-        .getElementById("cutting-calculator")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+  function changeCatalog(nextCatalogId: string) {
+    setCatalogId(nextCatalogId);
+    setToolId("");
+    setMaterialId("");
+    setParameterSetId("");
   }
 
   return (
     <>
       <div className="pageHead cuttingHead">
         <div>
-          <p>STEP 16 · CALCOLO GUIDATO</p>
+          <p>STEP 12 · CALCOLO PROFESSIONALE</p>
           <h1>Parametri di taglio</h1>
           <span>
-            Calcola dai cataloghi caricati o integrati, oppure inserisci
-            ogni parametro manualmente.
+            Scegli l’utensile dalla lista del catalogo e carica
+            automaticamente Vc, avanzamento, ap e ae.
           </span>
         </div>
 
         <div className="catalogBadge">
           <BookOpen size={18} />
           <div>
-            <b>
-              {catalogSelection
-                ? catalogSelection.catalogName
-                : sourceMode === "manual"
-                  ? "Calcolo manuale"
-                  : `${availableCatalogs.length} ${
-                      availableCatalogs.length === 1
-                        ? "catalogo disponibile"
-                        : "cataloghi disponibili"
-                    }`}
-            </b>
+            <b>{selectedTool?.catalogName || "Catalogo 56"}</b>
             <span>
-              {catalogSelection
-                ? `Pagina ${catalogSelection.page} in uso`
-                : sourceMode === "manual"
-                  ? "Dati inseriti a mano"
-                  : "Ricerca guidata nei cataloghi disponibili"}
+              {allTools.length
+                ? `${allTools.length} utensili utilizzabili`
+                : "Caricamento lista utensili…"}
             </span>
           </div>
         </div>
@@ -361,133 +310,124 @@ export default function CuttingParametersPage({
             <Calculator size={19} />
             <div>
               <b>Dati di lavorazione</b>
-              <span>
-                {catalogSelection
-                  ? "Valori ricavati dal catalogo caricato."
-                  : sourceMode === "manual"
-                    ? "Inserisci manualmente i dati richiesti."
-                    : "Trova utensile e parametri nei tuoi PDF."}
-              </span>
+              <span>Scegli lavorazione, utensile e materiale.</span>
             </div>
           </div>
 
-          <div
-            className="calculationModeTabs"
-            aria-label="Modalità di calcolo"
-          >
-            <button
-              type="button"
-              className={`calculationModeButton ${
-                sourceMode === "catalog" ? "active" : ""
-              }`}
-              onClick={selectCatalogCalculation}
-            >
-              <i>
-                <BookOpen size={17} />
-              </i>
-              <span>
-                <b>Da catalogo</b>
-                <small>Usa cataloghi integrati o caricati da te</small>
-              </span>
-            </button>
-
-            <button
-              className={`calculationModeButton ${
-                sourceMode === "manual" ? "active" : ""
-              }`}
-              type="button"
-              onClick={selectManualCalculation}
-            >
-              <i>
-                <Calculator size={17} />
-              </i>
-              <span>
-                <b>Calcolo manuale</b>
-                <small>Inserisci tutti i dati a mano</small>
-              </span>
-            </button>
-          </div>
-
-          {sourceMode === "catalog" && (
-            <CatalogGuidedCalculator
-              activeSelection={catalogSelection}
-              catalogs={availableCatalogs}
-              onApply={useCatalogSelection}
-            />
-          )}
-
-          {catalogSelection && (
-            <div className="catalogAppliedBanner">
-              <CheckCircle2 size={17} />
-              <div>
-                <b>Dati catalogo applicati</b>
-                <span>
-                  {catalogSelection.article || "Articolo non indicato"}{" "}
-                  {catalogSelection.radius
-                    ? `· R ${catalogSelection.radius} mm `
-                    : ""}
-                  · pagina {catalogSelection.page}
-                </span>
-              </div>
+          <div className="operationTabs" role="tablist">
+            {(
+              Object.keys(operationLabels) as CuttingOperation[]
+            ).map((item) => (
               <button
                 type="button"
-                onClick={clearCatalogCalculation}
+                role="tab"
+                aria-selected={operation === item}
+                key={item}
+                className={operation === item ? "active" : ""}
+                onClick={() => changeOperation(item)}
               >
-                Azzera dati catalogo
+                {operationLabels[item]}
               </button>
-            </div>
-          )}
+            ))}
+          </div>
 
-          {sourceMode === "manual" && (
-            <>
-              <div className="manualCalculationIntro">
-                <Calculator size={17} />
-                <span>
-                  Nessun dato del catalogo viene applicato. Scegli la
-                  lavorazione e compila i valori richiesti.
-                </span>
-              </div>
-              <div className="operationTabs" role="tablist">
-                {(
-                  Object.keys(operationLabels) as CuttingOperation[]
-                ).map((item) => (
-                  <button
-                    type="button"
-                    key={item}
-                    className={operation === item ? "active" : ""}
-                    onClick={() => {
-                      setOperation(item);
-                      setInsertShape("");
-                      setFeed("");
-                      setTeeth("");
-                    }}
-                  >
-                    {operationLabels[item]}
-                  </button>
+          <div className="cuttingFormGrid">
+            <label className="full">
+              <span>Catalogo</span>
+              <select
+                value={catalogId}
+                onChange={(event) => changeCatalog(event.target.value)}
+              >
+                <option value="all">Tutti i cataloghi disponibili</option>
+                {catalogs.map((catalog) => (
+                  <option value={catalog.id} key={catalog.id}>
+                    {catalog.name} · {catalog.toolCount || 0} utensili
+                  </option>
                 ))}
-              </div>
-            </>
-          )}
+              </select>
+            </label>
 
-          {calculationEnabled ? (
-            <>
-              <div className="cuttingFormGrid">
-            {operation === "turning" && (
+            <label className="full catalogSimpleSearch">
+              <span>Cerca nella lista</span>
+              <div>
+                <Search size={16} />
+                <input
+                  value={query}
+                  placeholder="Codice, modello, DNMG, punta HSS, fresa HM…"
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setToolId("");
+                  }}
+                />
+              </div>
+              <small>
+                {visibleTools.length}{" "}
+                {visibleTools.length === 1
+                  ? "utensile disponibile"
+                  : "utensili disponibili"}
+              </small>
+            </label>
+
+            <label className="full">
+              <span>Utensile dal catalogo</span>
+              <select
+                value={selectedTool?.id || ""}
+                disabled={!visibleTools.length}
+                onChange={(event) => {
+                  setToolId(event.target.value);
+                  setMaterialId("");
+                  setParameterSetId("");
+                }}
+              >
+                {!visibleTools.length && (
+                  <option value="">
+                    Nessun utensile trovato con questi filtri
+                  </option>
+                )}
+                {visibleTools.map((tool) => (
+                  <option value={tool.id} key={tool.id}>
+                    {toolOptionLabel(tool)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="full">
+              <span>Materiale da lavorare</span>
+              <select
+                value={materialId}
+                disabled={!materialOptions.length}
+                onChange={(event) => {
+                  setMaterialId(event.target.value);
+                  setParameterSetId("");
+                }}
+              >
+                {!materialOptions.length && (
+                  <option value="">Materiale non indicato</option>
+                )}
+                {materialOptions.map((material) => (
+                  <option value={material} key={material}>
+                    {materialLabel(material)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {parameterSets.length > 1 && (
               <label className="full">
-                <span>Forma placchetta</span>
+                <span>Set parametri e pagina fonte</span>
                 <select
-                  value={insertShape}
-                  disabled={
-                    !calculationEnabled || sourceMode === "catalog"
-                  }
+                  value={selectedParameterSet?.id || ""}
                   onChange={(event) =>
-                    setInsertShape(event.target.value)
+                    setParameterSetId(event.target.value)
                   }
                 >
-                  <option value="">Scegli la forma…</option>
-                  {turningShapes.map((shape) => (
-                    <option value={shape} key={shape}>
-                      {shape}
+                  {parameterSets.map((parameterSet, index) => (
+                    <option
+                      value={parameterSet.id}
+                      key={parameterSet.id}
+                    >
+                      {index + 1}. {parameterSet.label}
                     </option>
                   ))}
                 </select>
@@ -503,12 +443,8 @@ export default function CuttingParametersPage({
               </span>
               <input
                 inputMode="decimal"
-                placeholder="0"
                 value={diameter}
-                disabled={!calculationEnabled}
-                onChange={(event) =>
-                  setDiameter(event.target.value)
-                }
+                onChange={(event) => setDiameter(event.target.value)}
               />
             </label>
 
@@ -517,12 +453,8 @@ export default function CuttingParametersPage({
                 <span>Taglienti effettivi (Z)</span>
                 <input
                   inputMode="numeric"
-                  placeholder="0"
                   value={teeth}
-                  disabled={!calculationEnabled}
-                  onChange={(event) =>
-                    setTeeth(event.target.value)
-                  }
+                  onChange={(event) => setTeeth(event.target.value)}
                 />
               </label>
             )}
@@ -531,64 +463,48 @@ export default function CuttingParametersPage({
               <span>Lunghezza lavorata (mm)</span>
               <input
                 inputMode="decimal"
-                placeholder="0"
                 value={cutLength}
-                disabled={!calculationEnabled}
-                onChange={(event) =>
-                  setCutLength(event.target.value)
-                }
+                onChange={(event) => setCutLength(event.target.value)}
               />
             </label>
 
-            {catalogSelection && (
-              <label>
-                <span>Profilo intervallo catalogo</span>
-                <select
-                  value={profile}
-                  onChange={(event) =>
-                    setProfile(
-                      event.target.value as CuttingProfile,
-                    )
-                  }
-                >
-                  {(
-                    Object.keys(
-                      profileLabels,
-                    ) as CuttingProfile[]
-                  ).map((item) => (
-                    <option key={item} value={item}>
-                      {profileLabels[item]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+            <label>
+              <span>Profilo</span>
+              <select
+                value={profile}
+                onChange={(event) =>
+                  setProfile(event.target.value as CuttingProfile)
+                }
+              >
+                {(
+                  Object.keys(profileLabels) as CuttingProfile[]
+                ).map((item) => (
+                  <option key={item} value={item}>
+                    {profileLabels[item]}
+                  </option>
+                ))}
+              </select>
+            </label>
 
             <label>
               <span>Vc (m/min)</span>
               <input
                 inputMode="decimal"
-                placeholder="0"
                 value={vc}
-                disabled={!calculationEnabled}
                 onChange={(event) => setVc(event.target.value)}
               />
             </label>
 
             <label>
               <span>
-                {effectiveFeedMode === "per-tooth"
+                {feedMode === "per-tooth"
                   ? "fz (mm/dente)"
                   : "f (mm/giro)"}
               </span>
               <input
                 inputMode="decimal"
-                placeholder="0"
                 value={feed}
-                disabled={!calculationEnabled}
-                onChange={(event) =>
-                  setFeed(event.target.value)
-                }
+                onChange={(event) => setFeed(event.target.value)}
               />
             </label>
 
@@ -596,9 +512,8 @@ export default function CuttingParametersPage({
               <span>ap · Profondità di taglio ({apUnit})</span>
               <input
                 inputMode="decimal"
-                placeholder="0"
+                placeholder="Non indicato"
                 value={ap}
-                disabled={!calculationEnabled}
                 onChange={(event) => setAp(event.target.value)}
               />
             </label>
@@ -607,77 +522,59 @@ export default function CuttingParametersPage({
               <span>ae · Impegno radiale ({aeUnit})</span>
               <input
                 inputMode="decimal"
-                placeholder="0"
+                placeholder="Non indicato"
                 value={ae}
-                disabled={!calculationEnabled}
                 onChange={(event) => setAe(event.target.value)}
               />
             </label>
-              </div>
+          </div>
 
-              <div className="machineLimits">
-                <div className="cuttingSectionTitle compact">
-                  <Gauge size={18} />
-                  <div>
-                    <b>Limiti macchina</b>
-                    <span>Facoltativi, usati per gli avvisi.</span>
-                  </div>
-                </div>
-
-                <div className="cuttingFormGrid">
-                  <label className="full">
-                    <span>Macchina</span>
-                    <select
-                      value={machineId}
-                      onChange={(event) =>
-                        selectMachine(event.target.value)
-                      }
-                    >
-                      <option value="">
-                        Nessuna macchina selezionata
-                      </option>
-                      {machines.map((machine) => (
-                        <option key={machine.id} value={machine.id}>
-                          {machine.brand} {machine.model}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span>Giri massimi (rpm)</span>
-                    <input
-                      inputMode="numeric"
-                      placeholder="es. 12000"
-                      value={maxRpm}
-                      onChange={(event) =>
-                        setMaxRpm(event.target.value)
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>Avanzamento massimo (mm/min)</span>
-                    <input
-                      inputMode="numeric"
-                      placeholder="es. 8000"
-                      value={maxFeed}
-                      onChange={(event) =>
-                        setMaxFeed(event.target.value)
-                      }
-                    />
-                  </label>
-                </div>
+          <div className="machineLimits">
+            <div className="cuttingSectionTitle compact">
+              <Gauge size={18} />
+              <div>
+                <b>Limiti macchina</b>
+                <span>Facoltativi, usati per gli avvisi.</span>
               </div>
-            </>
-          ) : (
-            <div className="catalogDataPending">
-              <BookOpen size={18} />
-              <span>
-                Scegli un utensile dai risultati. Poi inserirai solo
-                diametro, lunghezza e gli eventuali limiti della
-                macchina.
-              </span>
             </div>
-          )}
+
+            <div className="cuttingFormGrid">
+              <label className="full">
+                <span>Macchina</span>
+                <select
+                  value={machineId}
+                  onChange={(event) =>
+                    selectMachine(event.target.value)
+                  }
+                >
+                  <option value="">Nessuna macchina selezionata</option>
+                  {machines.map((machine) => (
+                    <option key={machine.id} value={machine.id}>
+                      {machine.brand} {machine.model}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Giri massimi (rpm)</span>
+                <input
+                  inputMode="numeric"
+                  placeholder="es. 12000"
+                  value={maxRpm}
+                  onChange={(event) => setMaxRpm(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Avanzamento massimo (mm/min)</span>
+                <input
+                  inputMode="numeric"
+                  placeholder="es. 8000"
+                  value={maxFeed}
+                  onChange={(event) => setMaxFeed(event.target.value)}
+                />
+              </label>
+            </div>
+          </div>
         </div>
 
         <div className="cuttingResults">
@@ -723,8 +620,7 @@ export default function CuttingParametersPage({
                     <AlertTriangle size={18} />
                     <span>
                       Il risultato è stato limitato ai valori massimi
-                      della macchina. Verifica che il nuovo
-                      avanzamento mantenga un carico truciolo adatto.
+                      della macchina. Verifica il carico truciolo.
                     </span>
                   </div>
                 )}
@@ -737,23 +633,17 @@ export default function CuttingParametersPage({
                   <div>
                     <dt>Formula avanzamento</dt>
                     <dd>
-                      {effectiveFeedMode === "per-tooth"
+                      {feedMode === "per-tooth"
                         ? "Vf = n × Z × fz"
                         : "Vf = n × f"}
                     </dd>
                   </div>
                   <div>
-                    <dt>
-                      {catalogSelection
-                        ? "Intervallo catalogo Vc"
-                        : "Vc utilizzata"}
-                    </dt>
+                    <dt>Intervallo catalogo Vc</dt>
                     <dd>
-                      {catalogSelection
-                        ? `${catalogSelection.vc} m/min`
-                        : vc
-                          ? `${vc} m/min`
-                          : "—"}
+                      {selectedParameterSet?.vc
+                        ? `${selectedParameterSet.vc} m/min`
+                        : "—"}
                     </dd>
                   </div>
                   <div>
@@ -768,95 +658,110 @@ export default function CuttingParametersPage({
               </>
             ) : (
               <div className="resultAwaiting">
-                <Calculator size={24} />
-                <b>Il risultato apparirà qui</b>
+                <Calculator size={25} />
+                <b>Scegli un utensile dalla lista</b>
                 <span>
-                  {sourceMode === "catalog" && !catalogSelection
-                    ? "Carica o scegli un utensile dal catalogo."
-                    : operation === "milling" && !teeth
-                      ? "Inserisci diametro, numero di taglienti, Vc e fz."
-                      : "Inserisci almeno diametro, Vc e avanzamento."}
+                  Inserisci diametro e lunghezza per ottenere giri,
+                  avanzamento e tempo stimato.
                 </span>
               </div>
             )}
           </section>
 
-          {catalogSelection && (
-            <section className="panel sourcePanel catalogSourcePanel">
+          {selectedTool && selectedParameterSet ? (
+            <section className="panel sourcePanel">
               <div className="sourceTop">
                 <div>
-                  <span>Catalogo PDF caricato</span>
-                  <h2>{catalogSelection.catalogName}</h2>
+                  <span>{selectedTool.family}</span>
+                  <h2>{selectedTool.article}</h2>
                 </div>
-                <b>
-                  {catalogSelection.article ||
-                    `Pagina ${catalogSelection.page}`}
-                </b>
+                <b>Pag. {sourcePage}</b>
               </div>
 
               <div className="sourceTags">
-                {catalogSelection.family && (
-                  <span>{catalogSelection.family}</span>
+                <span>{selectedTool.category}</span>
+                {selectedTool.toolMaterial && (
+                  <span>{selectedTool.toolMaterial}</span>
                 )}
-                {catalogSelection.material && (
-                  <span>{catalogSelection.material}</span>
+                {selectedTool.radius && (
+                  <span>R {selectedTool.radius} mm</span>
                 )}
-                {catalogSelection.toolMaterial && (
-                  <span>{catalogSelection.toolMaterial}</span>
+                {materialId && (
+                  <span>{materialLabel(materialId)}</span>
                 )}
-                {catalogSelection.diameter && (
-                  <span>Ø {catalogSelection.diameter} mm</span>
-                )}
-                {catalogSelection.radius && (
-                  <span>R {catalogSelection.radius} mm</span>
-                )}
-                {catalogSelection.teeth && (
-                  <span>Z {catalogSelection.teeth}</span>
-                )}
-                <span>Pagina {catalogSelection.page}</span>
-                <span>Vc {catalogSelection.vc} m/min</span>
-                <span>
-                  {catalogSelection.feedKind === "fz" ? "fz" : "f"}{" "}
-                  {catalogSelection.feed}
-                </span>
               </div>
 
-              {catalogSelection.parameterSetLabel && (
-                <div className="catalogParameterSetSummary">
-                  <b>Set parametri scelto</b>
-                  <span>{catalogSelection.parameterSetLabel}</span>
-                </div>
-              )}
+              <div className="catalogParameterSetSummary">
+                <b>Parametri selezionati</b>
+                <span>
+                  Vc {selectedParameterSet.vc} m/min ·{" "}
+                  {selectedParameterSet.feedKind === "fz"
+                    ? "fz"
+                    : "f"}{" "}
+                  {selectedParameterSet.feed}{" "}
+                  {selectedParameterSet.feedUnit || ""}
+                </span>
+                {(selectedParameterSet.ap ||
+                  selectedParameterSet.ae) && (
+                  <span>
+                    {selectedParameterSet.ap
+                      ? `ap ${selectedParameterSet.ap} ${
+                          selectedParameterSet.apUnit || "mm"
+                        }`
+                      : ""}
+                    {selectedParameterSet.ap &&
+                    selectedParameterSet.ae
+                      ? " · "
+                      : ""}
+                    {selectedParameterSet.ae
+                      ? `ae ${selectedParameterSet.ae} ${
+                          selectedParameterSet.aeUnit || "mm"
+                        }`
+                      : ""}
+                  </span>
+                )}
+              </div>
 
-              <p>{catalogSelection.excerpt}</p>
+              <p>{selectedTool.excerpt}</p>
               <small>
-                Fonte selezionata dall’archivio cataloghi. I valori
-                restano modificabili nei campi del calcolatore.
+                Fonte: {selectedTool.catalogName}, pagina {sourcePage}.
               </small>
+            </section>
+          ) : (
+            <section className="panel sourcePanel waitingSourcePanel">
+              <div className="sourceTop">
+                <div>
+                  <span>Catalogo</span>
+                  <h2>Nessun utensile selezionato</h2>
+                </div>
+              </div>
             </section>
           )}
 
           <div className="cuttingDisclaimer">
             <AlertTriangle size={18} />
             <span>
-              {catalogSelection
-                ? "Valori estratti dal PDF: verifica che Vc, avanzamento e profondità appartengano alla stessa colonna di materiale, grado e geometria prima della produzione."
-                : sourceMode === "manual"
-                  ? "Valori manuali: confrontali con il catalogo del costruttore e parti con condizioni prudenti prima della produzione."
-                  : "Scegli un utensile nella ricerca guidata. Il calcolo userà soltanto i valori presenti nei cataloghi caricati da te."}
+              Valori iniziali del costruttore: partire dal profilo
+              prudente e correggere in base a serraggio, sporgenza,
+              refrigerazione, stabilità e potenza disponibili.
             </span>
           </div>
         </div>
       </section>
 
       <CatalogManager
-        activeCatalogId={catalogSelection?.catalogId}
-        activePageId={catalogSelection?.pageId}
+        activeCatalogId={selectedTool?.catalogId}
+        activePageId={
+          selectedParameterSet?.sourcePageId || selectedTool?.pageId
+        }
+        catalogFilterId={
+          catalogId === "all" ? undefined : catalogId
+        }
         enableCalculation={false}
         initiallyExpanded={false}
-        onCatalogsChange={setAvailableCatalogs}
-        onClearCalculation={clearCatalogCalculation}
-        onUseForCalculation={useCatalogSelection}
+        onCatalogsChange={setCatalogs}
+        onClearCalculation={() => undefined}
+        onUseForCalculation={() => undefined}
       />
     </>
   );
@@ -884,14 +789,69 @@ function ResultCard({
   );
 }
 
-function positiveNumber(value: string) {
-  const parsed = Number(value.replace(",", "."));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+function materialsForTool(tool: CatalogToolRecord | null) {
+  if (!tool) {
+    return [] as string[];
+  }
+
+  return Array.from(
+    new Set([
+      ...tool.materials,
+      ...tool.parameterSets
+        .map((parameterSet) => parameterSet.material)
+        .filter(Boolean),
+    ]),
+  ).sort();
 }
 
-function roundValue(value: number, digits: number) {
-  const multiplier = 10 ** digits;
-  return Math.round(value * multiplier) / multiplier;
+function parameterSetsForMaterial(
+  tool: CatalogToolRecord,
+  material: string,
+) {
+  if (!material) {
+    return tool.parameterSets;
+  }
+
+  const matching = tool.parameterSets.filter((parameterSet) =>
+    parameterSetSupportsMaterial(parameterSet, material),
+  );
+  return matching.length ? matching : tool.parameterSets;
+}
+
+function parameterSetSupportsMaterial(
+  parameterSet: CatalogParameterSet,
+  material: string,
+) {
+  if (parameterSet.material) {
+    return parameterSet.material === material;
+  }
+
+  const isoMatch = parameterSet.label.match(
+    /\bISO\s+([NPHMSK](?:\s*,\s*[NPHMSK])*)/i,
+  );
+  if (!isoMatch) {
+    return true;
+  }
+
+  return isoMatch[1]
+    .split(",")
+    .map((item) => item.trim().toUpperCase())
+    .includes(material.toUpperCase());
+}
+
+function toolOptionLabel(tool: CatalogToolRecord) {
+  return [
+    tool.article,
+    tool.family && tool.family !== tool.article ? tool.family : "",
+    tool.radius ? `R ${tool.radius}` : "",
+    `pag. ${tool.page}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function materialLabel(material: string) {
+  return materialNames[material] || material;
 }
 
 function valueForCatalogProfile(
@@ -923,6 +883,16 @@ function valueForCatalogProfile(
   return minimum + (maximum - minimum) * share;
 }
 
+function formatEditableValue(value: number, digits: number) {
+  const multiplier = 10 ** digits;
+  return String(Math.round(value * multiplier) / multiplier);
+}
+
+function positiveNumber(value: string) {
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 function parseSpindleRpm(value: string) {
   const match = value.match(/\d[\d.\s]*/);
   if (!match) {
@@ -943,4 +913,13 @@ function formatTime(minutes: number) {
   }
 
   return `${formatCuttingNumber(minutes, 2)} min`;
+}
+
+function foldText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
