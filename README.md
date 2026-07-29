@@ -3,7 +3,7 @@
 Applicazione professionale per organizzare dati, documentazione e attività di
 un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-Versione corrente: **2.7.2**.
+Versione corrente: **2.8.0**.
 
 ## Moduli disponibili
 
@@ -44,6 +44,12 @@ Versione corrente: **2.7.2**.
   - caricamento del primo PDF direttamente dal blocco di calcolo;
   - risultati nascosti finché diametro, `Vc` e avanzamento non sono
     validi, senza pannelli duplicati o valori a zero;
+  - archivio strutturato di punte, frese e placchette ricavato
+    automaticamente dai PDF;
+  - ricerca per codice, famiglia, materiale utensile, diametro e
+    raggio;
+  - scelta dell’utensile e del set di parametri tramite menu a tendina,
+    con caricamento immediato nel calcolatore;
   - recupero di `Vc`, `f/fz`, `ap` e `ae` direttamente dai PDF caricati;
   - calcolo manuale separato, con campi inizialmente vuoti;
   - assenza di valori preimpostati finché non viene scelta una scheda;

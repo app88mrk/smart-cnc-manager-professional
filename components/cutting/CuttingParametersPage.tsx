@@ -255,6 +255,15 @@ export default function CuttingParametersPage({
     );
     setAp(selection.ap);
     setAe(selection.ae);
+    if (
+      selection.operation !== "turning" &&
+      selection.diameter
+    ) {
+      setDiameter(selection.diameter);
+    }
+    if (selection.operation === "milling" && selection.teeth) {
+      setTeeth(selection.teeth);
+    }
 
     requestAnimationFrame(() => {
       document
@@ -368,6 +377,9 @@ export default function CuttingParametersPage({
                 <b>Dati catalogo applicati</b>
                 <span>
                   {catalogSelection.article || "Articolo non indicato"}{" "}
+                  {catalogSelection.radius
+                    ? `· R ${catalogSelection.radius} mm `
+                    : ""}
                   · pagina {catalogSelection.page}
                 </span>
               </div>
@@ -743,6 +755,18 @@ export default function CuttingParametersPage({
                 {catalogSelection.material && (
                   <span>{catalogSelection.material}</span>
                 )}
+                {catalogSelection.toolMaterial && (
+                  <span>{catalogSelection.toolMaterial}</span>
+                )}
+                {catalogSelection.diameter && (
+                  <span>Ø {catalogSelection.diameter} mm</span>
+                )}
+                {catalogSelection.radius && (
+                  <span>R {catalogSelection.radius} mm</span>
+                )}
+                {catalogSelection.teeth && (
+                  <span>Z {catalogSelection.teeth}</span>
+                )}
                 <span>Pagina {catalogSelection.page}</span>
                 <span>Vc {catalogSelection.vc} m/min</span>
                 <span>
@@ -750,6 +774,13 @@ export default function CuttingParametersPage({
                   {catalogSelection.feed}
                 </span>
               </div>
+
+              {catalogSelection.parameterSetLabel && (
+                <div className="catalogParameterSetSummary">
+                  <b>Set parametri scelto</b>
+                  <span>{catalogSelection.parameterSetLabel}</span>
+                </div>
+              )}
 
               <p>{catalogSelection.excerpt}</p>
               <small>

@@ -137,8 +137,9 @@ export default function CatalogManager({
           parameterPages:
             summary.parameterPages + catalog.parameterPageCount,
           codes: summary.codes + catalog.codeCount,
+          tools: summary.tools + (catalog.toolCount || 0),
         }),
-        { pages: 0, parameterPages: 0, codes: 0 },
+        { pages: 0, parameterPages: 0, codes: 0, tools: 0 },
       ),
     [catalogs],
   );
@@ -355,6 +356,10 @@ export default function CatalogManager({
                   <span>Codici rilevati</span>
                   <b>{totals.codes}</b>
                 </div>
+                <div>
+                  <span>Utensili utilizzabili</span>
+                  <b>{totals.tools}</b>
+                </div>
               </div>
 
               <div className="catalogCards">
@@ -366,7 +371,7 @@ export default function CatalogManager({
                       <span>
                         {formatCatalogFileSize(catalog.fileSize)} ·{" "}
                         {catalog.pageCount} pagine ·{" "}
-                        {catalog.parameterPageCount} con parametri
+                        {catalog.toolCount || 0} utensili
                       </span>
                     </div>
                     <button

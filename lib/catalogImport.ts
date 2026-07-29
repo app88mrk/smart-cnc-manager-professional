@@ -33,7 +33,40 @@ export type CatalogSearchPage = CatalogPageRecord & {
   catalogName: string;
 };
 
+export type CatalogParameterSet = {
+  id: string;
+  label: string;
+  material: string;
+  vc: string;
+  feed: string;
+  feedKind: "feed" | "fz";
+  ap: string;
+  ae: string;
+};
+
+export type CatalogToolRecord = {
+  id: string;
+  catalogId: string;
+  catalogName: string;
+  pageId: string;
+  page: number;
+  operation: CatalogCalculationOperation;
+  category: string;
+  family: string;
+  article: string;
+  brand: string;
+  toolMaterial: string;
+  diameter: string;
+  radius: string;
+  teeth: string;
+  materials: string[];
+  parameterSets: CatalogParameterSet[];
+  searchText: string;
+  excerpt: string;
+};
+
 export type CatalogCalculationSelection = {
+  toolId?: string;
   pageId: string;
   catalogId: string;
   catalogName: string;
@@ -48,6 +81,11 @@ export type CatalogCalculationSelection = {
   ap: string;
   ae: string;
   profile?: "conservative" | "standard" | "productive";
+  diameter?: string;
+  radius?: string;
+  teeth?: string;
+  toolMaterial?: string;
+  parameterSetLabel?: string;
   excerpt: string;
 };
 
@@ -61,7 +99,10 @@ export type ImportedCatalog = {
   textPageCount: number;
   parameterPageCount: number;
   codeCount: number;
+  toolCount: number;
+  toolIndexVersion: number;
   pages: CatalogPageRecord[];
+  tools: CatalogToolRecord[];
 };
 
 export type CatalogImportProgress = {
@@ -84,6 +125,7 @@ const DB_NAME = "smart-cnc-manager-catalogs";
 const DB_VERSION = 1;
 const CATALOG_STORE = "catalogs";
 const MAX_PAGE_TEXT_LENGTH = 30_000;
+const TOOL_INDEX_VERSION = 1;
 
 const insertFamilies: Array<{
   label: string;
@@ -249,9 +291,13 @@ export async function extractCatalogFromFile(
       }
     }
 
+    const catalogName = file.name.replace(/\.pdf$/i, "");
+    const tools = pages.flatMap((page) =>
+      buildCatalogToolsFromPage(page, catalogName),
+    );
     const catalog: ImportedCatalog = {
       id: catalogId,
-      name: file.name.replace(/\.pdf$/i, ""),
+      name: catalogName,
       fileName: file.name,
       fileSize: file.size,
       importedAt: new Date().toISOString(),
@@ -259,7 +305,10 @@ export async function extractCatalogFromFile(
       textPageCount: pages.length,
       parameterPageCount,
       codeCount: allCodes.size,
+      toolCount: tools.length,
+      toolIndexVersion: TOOL_INDEX_VERSION,
       pages,
+      tools,
     };
 
     return catalog;
@@ -384,6 +433,379 @@ export function searchCatalogPages(
     );
 }
 
+export function catalogToolsFromCatalogs(
+  catalogs: ImportedCatalog[],
+) {
+  return catalogs.flatMap((catalog) =>
+    catalog.toolIndexVersion === TOOL_INDEX_VERSION &&
+    catalog.tools?.length
+      ? catalog.tools
+      : catalog.pages.flatMap((page) =>
+          buildCatalogToolsFromPage(page, catalog.name),
+        ),
+  );
+}
+
+export function buildCatalogToolsFromPage(
+  page: CatalogPageRecord,
+  catalogName: string,
+) {
+  const operations = inferPageOperations(page);
+  if (!operations.length) {
+    return [] as CatalogToolRecord[];
+  }
+
+  return operations.flatMap((operation) => {
+    const parameterSets = parameterSetsForPage(page, operation);
+    if (!parameterSets.length) {
+      return [];
+    }
+
+    const references = likelyToolReferences(page, operation);
+    const records = references.length
+      ? references
+      : [
+          page.families.find((family) =>
+            familyMatchesOperation(family, operation),
+          ) || operationCategory(operation),
+        ];
+
+    return unique(records)
+      .slice(0, 80)
+      .map((article, index) => {
+        const family = familyForTool(page, article, operation);
+        const nearbyText = textNearReference(page.text, article);
+        const diameter =
+          operation === "turning"
+            ? ""
+            : detectDiameter(nearbyText);
+        const radius =
+          detectRadius(nearbyText) ||
+          insertRadiusFromIsoCode(article);
+        const teeth =
+          operation === "milling"
+            ? detectTeeth(nearbyText)
+            : "";
+        const toolMaterial = detectToolMaterial(
+          `${nearbyText} ${page.text}`,
+        );
+        const brand = page.brands[0] || "";
+        const category = operationCategory(operation);
+        const searchText = foldText(
+          [
+            catalogName,
+            article,
+            family,
+            category,
+            brand,
+            toolMaterial,
+            diameter ? `diametro ${diameter}` : "",
+            radius ? `raggio ${radius}` : "",
+            teeth ? `taglienti ${teeth}` : "",
+            ...page.materials,
+          ].join(" "),
+        );
+
+        return {
+          id: `${page.id}-${operation}-${safeId(article)}-${index}`,
+          catalogId: page.catalogId,
+          catalogName,
+          pageId: page.id,
+          page: page.page,
+          operation,
+          category,
+          family,
+          article,
+          brand,
+          toolMaterial,
+          diameter,
+          radius,
+          teeth,
+          materials: page.materials,
+          parameterSets,
+          searchText,
+          excerpt: catalogPageExcerpt(page, article || family),
+        };
+      });
+  });
+}
+
+function inferPageOperations(page: CatalogPageRecord) {
+  const source = foldText(
+    `${page.families.join(" ")} ${page.searchText}`,
+  );
+  const operations: CatalogCalculationOperation[] = [];
+
+  if (/\b(punta|punte|foratur|drill|alesator)\b/.test(source)) {
+    operations.push("drilling");
+  }
+  if (
+    /\b(fresa|frese|fresatur|milling)\b/.test(source) ||
+    page.parameters.fz.length > 0
+  ) {
+    operations.push("milling");
+  }
+  if (
+    /\b(placchett|inserti|tornitur|turning|cnmg|dnmg|knux|snmg|tnmg|vnmg|wnmg|rngn|ccgt|ccmt|dcgt|dcmt|rcgt|rcmt|scgt|scmt|tcgt|tcmt|vbgt|vbmt|vcgt|vcmt)\b/.test(
+      source,
+    )
+  ) {
+    operations.push("turning");
+  }
+
+  return unique(operations) as CatalogCalculationOperation[];
+}
+
+function parameterSetsForPage(
+  page: CatalogPageRecord,
+  operation: CatalogCalculationOperation,
+) {
+  const feedKind =
+    operation === "milling" && page.parameters.fz.length
+      ? "fz"
+      : "feed";
+  const vcValues = page.parameters.vc;
+  const feedValues = page.parameters[feedKind];
+
+  if (!vcValues.length || !feedValues.length) {
+    return [] as CatalogParameterSet[];
+  }
+
+  const count =
+    vcValues.length > 1 && feedValues.length > 1
+      ? Math.min(vcValues.length, feedValues.length)
+      : Math.max(vcValues.length, feedValues.length);
+  const sets: CatalogParameterSet[] = [];
+
+  for (let index = 0; index < Math.min(count, 20); index += 1) {
+    const vc = valueAt(vcValues, index);
+    const feed = valueAt(feedValues, index);
+    if (!vc || !feed) {
+      continue;
+    }
+
+    const material =
+      page.materials.length === count
+        ? page.materials[index] || ""
+        : page.materials[0] || "";
+    const ap = valueAt(page.parameters.ap, index);
+    const ae = valueAt(page.parameters.ae, index);
+    const labelParts = [
+      material,
+      `Vc ${vc}`,
+      `${feedKind === "fz" ? "fz" : "f"} ${feed}`,
+      ap ? `ap ${ap}` : "",
+      ae ? `ae ${ae}` : "",
+    ].filter(Boolean);
+
+    sets.push({
+      id: `${page.id}-${operation}-set-${index}`,
+      label: labelParts.join(" · "),
+      material,
+      vc,
+      feed,
+      feedKind,
+      ap,
+      ae,
+    });
+  }
+
+  return uniqueBy(
+    sets,
+    (set) =>
+      `${set.material}|${set.vc}|${set.feed}|${set.ap}|${set.ae}`,
+  );
+}
+
+function likelyToolReferences(
+  page: CatalogPageRecord,
+  operation: CatalogCalculationOperation,
+) {
+  const gradePattern =
+    /^(?:HB|HU|CU|GC|KC|TP|TK|CP|MP|VP|AC)\d{3,}(?:-\d+)?$/i;
+  const standardsPattern = /^(?:DIN|ISO)\s*\d+/i;
+
+  return page.codes.filter((code) => {
+    if (gradePattern.test(code) || standardsPattern.test(code)) {
+      return false;
+    }
+    if (operation !== "turning") {
+      return true;
+    }
+
+    return (
+      /^\d{2}\s+\d{4}$/.test(code) ||
+      /^[A-Z]{4}[\s.-]?\d{4,}/i.test(code) ||
+      page.families.some((family) =>
+        foldText(code).includes(foldText(family.split(" / ")[0])),
+      )
+    );
+  });
+}
+
+function familyForTool(
+  page: CatalogPageRecord,
+  article: string,
+  operation: CatalogCalculationOperation,
+) {
+  const foldedArticle = foldText(article);
+  return (
+    page.families.find((family) =>
+      foldedArticle.includes(
+        foldText(family.split(" / ")[0]),
+      ),
+    ) ||
+    page.families.find((family) =>
+      familyMatchesOperation(family, operation),
+    ) ||
+    operationCategory(operation)
+  );
+}
+
+function familyMatchesOperation(
+  family: string,
+  operation: CatalogCalculationOperation,
+) {
+  const folded = foldText(family);
+  if (operation === "drilling") {
+    return /punt|alesator|drill/.test(folded);
+  }
+  if (operation === "milling") {
+    return /fres|mill/.test(folded);
+  }
+  return !/punt|alesator|drill|fres|mill/.test(folded);
+}
+
+function operationCategory(
+  operation: CatalogCalculationOperation,
+) {
+  if (operation === "drilling") {
+    return "Punta";
+  }
+  if (operation === "milling") {
+    return "Fresa";
+  }
+  return "Placchetta";
+}
+
+function textNearReference(text: string, reference: string) {
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  const foldedReference = foldText(reference);
+  const index = lines.findIndex((line) =>
+    foldText(line).includes(foldedReference),
+  );
+
+  if (index < 0) {
+    return lines.slice(0, 12).join(" ");
+  }
+
+  return lines
+    .slice(Math.max(0, index - 1), Math.min(lines.length, index + 2))
+    .join(" ");
+}
+
+function detectDiameter(source: string) {
+  const patterns = [
+    /(?:Ø|⌀|diam(?:etro)?|dia\.?)\s*[:=]?\s*(\d{1,3}(?:[.,]\d{1,3})?)\s*(?:mm)?/i,
+    /\bD\s*[:=]\s*(\d{1,3}(?:[.,]\d{1,3})?)\s*(?:mm)?/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    if (match) {
+      return normalizeDecimal(match[1]);
+    }
+  }
+
+  return "";
+}
+
+function detectRadius(source: string) {
+  const match = source.match(
+    /\b(?:R|RE)\s*[:=]?\s*(\d{1,2}(?:[.,]\d{1,3})?)\s*(?:mm)?\b/i,
+  );
+  return match ? normalizeDecimal(match[1]) : "";
+}
+
+function insertRadiusFromIsoCode(article: string) {
+  const compact = article.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const match = compact.match(
+    /^(?:CNMG|DNMG|KNUX|SNMG|TNMG|VNMG|WNMG|RNGN|CCGT|CCMT|DCGT|DCMT|RCGT|RCMT|SCGT|SCMT|TCGT|TCMT|VBGT|VBMT|VCGT|VCMT)(\d{6,})/,
+  );
+  if (!match) {
+    return "";
+  }
+
+  const digits = match[1];
+  const radiusCode = Number(digits.slice(-2));
+  return radiusCode > 0
+    ? String(Math.round(radiusCode * 10) / 100).replace(".", ",")
+    : "";
+}
+
+function detectTeeth(source: string) {
+  const match = source.match(
+    /\b(?:Z|taglienti?)\s*[:=]?\s*(\d{1,2})\b/i,
+  );
+  return match ? match[1] : "";
+}
+
+function detectToolMaterial(source: string) {
+  const folded = foldText(source);
+  if (/\bhss[\s-]*pm\b/.test(folded)) {
+    return "HSS-PM";
+  }
+  if (/\bhss[\s-]*e\b/.test(folded)) {
+    return "HSS-E";
+  }
+  if (/\bhss\b/.test(folded)) {
+    return "HSS";
+  }
+  if (
+    /\b(vhm|hm|carbide)\b/.test(folded) ||
+    folded.includes("metallo duro integrale")
+  ) {
+    return "Metallo duro";
+  }
+  if (folded.includes("metallo duro")) {
+    return "Metallo duro";
+  }
+  return "";
+}
+
+function valueAt(values: string[], index: number) {
+  if (!values.length) {
+    return "";
+  }
+  if (values.length === 1) {
+    return values[0];
+  }
+  return values[index] || "";
+}
+
+function normalizeDecimal(value: string) {
+  return value.replace(".", ",").replace(/^0+(?=\d)/, "");
+}
+
+function safeId(value: string) {
+  return foldText(value).replace(/[^a-z0-9]+/g, "-") || "tool";
+}
+
+function uniqueBy<T>(
+  values: T[],
+  keyForValue: (value: T) => string,
+) {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = keyForValue(value);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 export async function loadImportedCatalogs() {
   if (typeof indexedDB === "undefined") {
     return [] as ImportedCatalog[];
@@ -398,9 +820,11 @@ export async function loadImportedCatalogs() {
         .getAll(),
     );
 
-    return catalogs.sort((left, right) =>
-      right.importedAt.localeCompare(left.importedAt),
-    );
+    return catalogs
+      .map(normalizeImportedCatalog)
+      .sort((left, right) =>
+        right.importedAt.localeCompare(left.importedAt),
+      );
   } finally {
     database.close();
   }
@@ -415,7 +839,9 @@ export async function saveImportedCatalog(
       CATALOG_STORE,
       "readwrite",
     );
-    transaction.objectStore(CATALOG_STORE).put(catalog);
+    transaction
+      .objectStore(CATALOG_STORE)
+      .put(normalizeImportedCatalog(catalog));
     await transactionComplete(transaction);
   } finally {
     database.close();
@@ -462,6 +888,23 @@ export function catalogPageExcerpt(
   return `${start > 0 ? "…" : ""}${excerpt}${
     start + 320 < singleLine.length ? "…" : ""
   }`;
+}
+
+function normalizeImportedCatalog(catalog: ImportedCatalog) {
+  const tools =
+    catalog.toolIndexVersion === TOOL_INDEX_VERSION &&
+    catalog.tools?.length
+      ? catalog.tools
+      : catalog.pages.flatMap((page) =>
+        buildCatalogToolsFromPage(page, catalog.name),
+      );
+
+  return {
+    ...catalog,
+    toolCount: tools.length,
+    toolIndexVersion: TOOL_INDEX_VERSION,
+    tools,
+  };
 }
 
 function textItemsToLines(items: PdfTextItem[]) {
