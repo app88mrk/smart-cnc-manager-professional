@@ -193,10 +193,10 @@ export default function CatalogGuidedCalculator({
   ) {
     onApply({
       toolId: tool.id,
-      pageId: tool.pageId,
+      pageId: parameterSet.sourcePageId || tool.pageId,
       catalogId: tool.catalogId,
       catalogName: tool.catalogName,
-      page: tool.page,
+      page: parameterSet.sourcePage || tool.page,
       operation: tool.operation,
       family: tool.family,
       article: tool.article,
@@ -207,8 +207,11 @@ export default function CatalogGuidedCalculator({
       vc: parameterSet.vc,
       feed: parameterSet.feed,
       feedKind: parameterSet.feedKind,
+      feedUnit: parameterSet.feedUnit,
       ap: parameterSet.ap,
+      apUnit: parameterSet.apUnit,
       ae: parameterSet.ae,
+      aeUnit: parameterSet.aeUnit,
       profile: selectedProfile,
       diameter: tool.diameter,
       radius: tool.radius,
@@ -287,7 +290,7 @@ export default function CatalogGuidedCalculator({
             <option value="all">Tutti i cataloghi caricati</option>
             {catalogs.map((catalog) => (
               <option value={catalog.id} key={catalog.id}>
-                {catalog.name}
+                {catalog.name} · {catalog.toolCount || 0} utensili
               </option>
             ))}
           </select>
@@ -342,7 +345,7 @@ export default function CatalogGuidedCalculator({
           <span>
             {results.length === MAX_TOOL_OPTIONS
               ? "Affina la ricerca per vedere meno risultati."
-              : "Elenco creato automaticamente dai PDF caricati."}
+              : "Elenco creato automaticamente dai cataloghi disponibili."}
           </span>
         </div>
       </div>
@@ -371,7 +374,7 @@ export default function CatalogGuidedCalculator({
                 <div className="guidedSelectedToolHead">
                   <div>
                     <span>
-                      {selectedTool.catalogName} · pagina{" "}
+                      {selectedTool.catalogName} · pagina scheda{" "}
                       {selectedTool.page}
                     </span>
                     <b>
@@ -454,6 +457,22 @@ export default function CatalogGuidedCalculator({
                       ? "fz"
                       : "f"}{" "}
                     {selectedParameterSet.feed}
+                    {selectedParameterSet.feedUnit
+                      ? ` ${selectedParameterSet.feedUnit}`
+                      : ""}
+                    {selectedParameterSet.ap
+                      ? ` · ap ${selectedParameterSet.ap} ${
+                          selectedParameterSet.apUnit || "mm"
+                        }`
+                      : ""}
+                    {selectedParameterSet.ae
+                      ? ` · ae ${selectedParameterSet.ae} ${
+                          selectedParameterSet.aeUnit || "mm"
+                        }`
+                      : ""}
+                    {selectedParameterSet.sourcePage
+                      ? ` · pag. ${selectedParameterSet.sourcePage}`
+                      : ""}
                   </span>
                 </div>
               </div>
@@ -471,9 +490,8 @@ export default function CatalogGuidedCalculator({
       )}
 
       <div className="guidedImportNotice">
-        I valori sono riconosciuti automaticamente dalle tabelle PDF:
-        controlla materiale, geometria e pagina prima della
-        lavorazione.
+        I valori provengono dalle tabelle dei cataloghi: controlla
+        materiale, geometria e pagina fonte prima della lavorazione.
       </div>
     </div>
   );

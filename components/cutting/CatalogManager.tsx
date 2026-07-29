@@ -213,6 +213,10 @@ export default function CatalogManager({
   }
 
   async function removeCatalog(catalog: ImportedCatalog) {
+    if (catalog.isBuiltIn) {
+      return;
+    }
+
     if (pendingDelete !== catalog.id) {
       setPendingDelete(catalog.id);
       return;
@@ -242,7 +246,7 @@ export default function CatalogManager({
           <div>
             <b>Archivio cataloghi</b>
             <span>
-              Carica PDF e cerca automaticamente codici e parametri.
+              Consulta il catalogo integrato o carica altri PDF.
             </span>
           </div>
         </div>
@@ -369,28 +373,41 @@ export default function CatalogManager({
                     <div>
                       <b>{catalog.name}</b>
                       <span>
-                        {formatCatalogFileSize(catalog.fileSize)} ·{" "}
+                        {catalog.isBuiltIn
+                          ? "Catalogo integrato"
+                          : formatCatalogFileSize(catalog.fileSize)}{" "}
+                        ·{" "}
                         {catalog.pageCount} pagine ·{" "}
-                        {catalog.toolCount || 0} utensili
+                        {catalog.toolCount || 0} utensili utilizzabili
+                        {catalog.sourceToolCount &&
+                        catalog.sourceToolCount !== catalog.toolCount
+                          ? ` su ${catalog.sourceToolCount} voci`
+                          : ""}
                       </span>
                     </div>
-                    <button
-                      className={
-                        pendingDelete === catalog.id
-                          ? "confirm"
-                          : ""
-                      }
-                      type="button"
-                      title={
-                        pendingDelete === catalog.id
-                          ? "Conferma eliminazione"
-                          : "Elimina catalogo"
-                      }
-                      onClick={() => removeCatalog(catalog)}
-                    >
-                      <Trash2 size={15} />
-                      {pendingDelete === catalog.id && "Conferma"}
-                    </button>
+                    {catalog.isBuiltIn ? (
+                      <span className="catalogBuiltInBadge">
+                        Integrato
+                      </span>
+                    ) : (
+                      <button
+                        className={
+                          pendingDelete === catalog.id
+                            ? "confirm"
+                            : ""
+                        }
+                        type="button"
+                        title={
+                          pendingDelete === catalog.id
+                            ? "Conferma eliminazione"
+                            : "Elimina catalogo"
+                        }
+                        onClick={() => removeCatalog(catalog)}
+                      >
+                        <Trash2 size={15} />
+                        {pendingDelete === catalog.id && "Conferma"}
+                      </button>
+                    )}
                   </article>
                 ))}
               </div>

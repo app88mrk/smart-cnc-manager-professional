@@ -92,6 +92,14 @@ export default function CuttingParametersPage({
       : "per-revolution";
   const calculationEnabled =
     sourceMode === "manual" || Boolean(catalogSelection);
+  const apUnit =
+    sourceMode === "catalog" && catalogSelection?.apUnit
+      ? catalogSelection.apUnit
+      : "mm";
+  const aeUnit =
+    sourceMode === "catalog" && catalogSelection?.aeUnit
+      ? catalogSelection.aeUnit
+      : "mm";
 
   useEffect(() => {
     if (!catalogSelection) {
@@ -116,6 +124,26 @@ export default function CuttingParametersPage({
           3,
         ),
       ),
+    );
+    setAp(
+      catalogSelection.ap
+        ? String(
+            roundValue(
+              valueForCatalogProfile(catalogSelection.ap, profile),
+              3,
+            ),
+          )
+        : "",
+    );
+    setAe(
+      catalogSelection.ae
+        ? String(
+            roundValue(
+              valueForCatalogProfile(catalogSelection.ae, profile),
+              3,
+            ),
+          )
+        : "",
     );
   }, [catalogSelection, profile]);
 
@@ -253,8 +281,26 @@ export default function CuttingParametersPage({
         ),
       ),
     );
-    setAp(selection.ap);
-    setAe(selection.ae);
+    setAp(
+      selection.ap
+        ? String(
+            roundValue(
+              valueForCatalogProfile(selection.ap, selectionProfile),
+              3,
+            ),
+          )
+        : "",
+    );
+    setAe(
+      selection.ae
+        ? String(
+            roundValue(
+              valueForCatalogProfile(selection.ae, selectionProfile),
+              3,
+            ),
+          )
+        : "",
+    );
     if (
       selection.operation !== "turning" &&
       selection.diameter
@@ -279,7 +325,7 @@ export default function CuttingParametersPage({
           <p>STEP 16 · CALCOLO GUIDATO</p>
           <h1>Parametri di taglio</h1>
           <span>
-            Calcola dai cataloghi che hai caricato oppure inserisci
+            Calcola dai cataloghi caricati o integrati, oppure inserisci
             ogni parametro manualmente.
           </span>
         </div>
@@ -303,7 +349,7 @@ export default function CuttingParametersPage({
                 ? `Pagina ${catalogSelection.page} in uso`
                 : sourceMode === "manual"
                   ? "Dati inseriti a mano"
-                  : "Ricerca guidata nei PDF caricati"}
+                  : "Ricerca guidata nei cataloghi disponibili"}
             </span>
           </div>
         </div>
@@ -341,7 +387,7 @@ export default function CuttingParametersPage({
               </i>
               <span>
                 <b>Da catalogo</b>
-                <small>Usa i PDF caricati da te</small>
+                <small>Usa cataloghi integrati o caricati da te</small>
               </span>
             </button>
 
@@ -547,7 +593,7 @@ export default function CuttingParametersPage({
             </label>
 
             <label>
-              <span>ap · Profondità di taglio (mm)</span>
+              <span>ap · Profondità di taglio ({apUnit})</span>
               <input
                 inputMode="decimal"
                 placeholder="0"
@@ -558,7 +604,7 @@ export default function CuttingParametersPage({
             </label>
 
             <label>
-              <span>ae · Impegno radiale (mm)</span>
+              <span>ae · Impegno radiale ({aeUnit})</span>
               <input
                 inputMode="decimal"
                 placeholder="0"
@@ -712,11 +758,11 @@ export default function CuttingParametersPage({
                   </div>
                   <div>
                     <dt>Profondità ap</dt>
-                    <dd>{ap ? `${ap} mm` : "—"}</dd>
+                    <dd>{ap ? `${ap} ${apUnit}` : "—"}</dd>
                   </div>
                   <div>
                     <dt>Impegno ae</dt>
-                    <dd>{ae ? `${ae} mm` : "—"}</dd>
+                    <dd>{ae ? `${ae} ${aeUnit}` : "—"}</dd>
                   </div>
                 </dl>
               </>

@@ -40,8 +40,14 @@ export type CatalogParameterSet = {
   vc: string;
   feed: string;
   feedKind: "feed" | "fz";
+  feedUnit?: string;
   ap: string;
+  apUnit?: string;
   ae: string;
+  aeUnit?: string;
+  sourcePage?: number;
+  sourcePageId?: string;
+  sourceSection?: string;
 };
 
 export type CatalogToolRecord = {
@@ -78,8 +84,11 @@ export type CatalogCalculationSelection = {
   vc: string;
   feed: string;
   feedKind: "feed" | "fz";
+  feedUnit?: string;
   ap: string;
+  apUnit?: string;
   ae: string;
+  aeUnit?: string;
   profile?: "conservative" | "standard" | "productive";
   diameter?: string;
   radius?: string;
@@ -100,7 +109,9 @@ export type ImportedCatalog = {
   parameterPageCount: number;
   codeCount: number;
   toolCount: number;
+  sourceToolCount?: number;
   toolIndexVersion: number;
+  isBuiltIn?: boolean;
   pages: CatalogPageRecord[];
   tools: CatalogToolRecord[];
 };
@@ -126,6 +137,9 @@ const DB_VERSION = 1;
 const CATALOG_STORE = "catalogs";
 const MAX_PAGE_TEXT_LENGTH = 30_000;
 const TOOL_INDEX_VERSION = 1;
+const BUILT_IN_CATALOG_URLS = [
+  "/data/catalogo-hoffmann-56-90025000.json",
+];
 
 const insertFamilies: Array<{
   label: string;
@@ -807,26 +821,43 @@ function uniqueBy<T>(
 }
 
 export async function loadImportedCatalogs() {
+  const builtInCatalogs = await loadBuiltInCatalogs();
+
   if (typeof indexedDB === "undefined") {
-    return [] as ImportedCatalog[];
+    return builtInCatalogs;
   }
 
-  const database = await openCatalogDatabase();
   try {
-    const catalogs = await requestResult<ImportedCatalog[]>(
-      database
-        .transaction(CATALOG_STORE, "readonly")
-        .objectStore(CATALOG_STORE)
-        .getAll(),
-    );
-
-    return catalogs
-      .map(normalizeImportedCatalog)
-      .sort((left, right) =>
-        right.importedAt.localeCompare(left.importedAt),
+    const database = await openCatalogDatabase();
+    try {
+      const catalogs = await requestResult<ImportedCatalog[]>(
+        database
+          .transaction(CATALOG_STORE, "readonly")
+          .objectStore(CATALOG_STORE)
+          .getAll(),
       );
-  } finally {
-    database.close();
+
+      const storedCatalogs = catalogs
+        .map(normalizeImportedCatalog)
+        .filter(
+          (catalog) =>
+            !builtInCatalogs.some(
+              (builtIn) => builtIn.id === catalog.id,
+            ),
+        )
+        .sort((left, right) =>
+          right.importedAt.localeCompare(left.importedAt),
+        );
+
+      return [...builtInCatalogs, ...storedCatalogs];
+    } finally {
+      database.close();
+    }
+  } catch (error) {
+    if (builtInCatalogs.length) {
+      return builtInCatalogs;
+    }
+    throw error;
   }
 }
 
@@ -905,6 +936,31 @@ function normalizeImportedCatalog(catalog: ImportedCatalog) {
     toolIndexVersion: TOOL_INDEX_VERSION,
     tools,
   };
+}
+
+async function loadBuiltInCatalogs() {
+  if (typeof fetch === "undefined") {
+    return [] as ImportedCatalog[];
+  }
+
+  const results = await Promise.allSettled(
+    BUILT_IN_CATALOG_URLS.map(async (url) => {
+      const response = await fetch(url, { cache: "force-cache" });
+      if (!response.ok) {
+        throw new Error(
+          `Catalogo integrato non disponibile (${response.status}).`,
+        );
+      }
+
+      return normalizeImportedCatalog(
+        (await response.json()) as ImportedCatalog,
+      );
+    }),
+  );
+
+  return results.flatMap((result) =>
+    result.status === "fulfilled" ? [result.value] : [],
+  );
 }
 
 function textItemsToLines(items: PdfTextItem[]) {
