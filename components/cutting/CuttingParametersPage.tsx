@@ -47,6 +47,8 @@ const materialNames: Record<string, string> = {
   H: "H · Materiali temprati",
 };
 
+type CalculationMode = "base" | "tpc";
+
 export default function CuttingParametersPage({
   machines,
 }: CuttingParametersPageProps) {
@@ -60,6 +62,8 @@ export default function CuttingParametersPage({
   const [parameterSetId, setParameterSetId] = useState("");
   const [profile, setProfile] =
     useState<CuttingProfile>("conservative");
+  const [calculationMode, setCalculationMode] =
+    useState<CalculationMode>("base");
   const [diameter, setDiameter] = useState("10");
   const [teeth, setTeeth] = useState("2");
   const [cutLength, setCutLength] = useState("50");
@@ -67,6 +71,7 @@ export default function CuttingParametersPage({
   const [feed, setFeed] = useState("");
   const [ap, setAp] = useState("");
   const [ae, setAe] = useState("");
+  const [engagementWidth, setEngagementWidth] = useState("");
   const [machineId, setMachineId] = useState("");
   const [maxRpm, setMaxRpm] = useState("");
   const [maxFeed, setMaxFeed] = useState("");
@@ -181,10 +186,20 @@ export default function CuttingParametersPage({
           )
         : "",
     );
+    const catalogAe = selectedParameterSet.ae
+      ? valueForCatalogProfile(selectedParameterSet.ae, profile)
+      : 0;
     setAe(
-      selectedParameterSet.ae
+      catalogAe
+        ? formatEditableValue(catalogAe, 3)
+        : "",
+    );
+    setEngagementWidth(
+      catalogAe
         ? formatEditableValue(
-            valueForCatalogProfile(selectedParameterSet.ae, profile),
+            selectedParameterSet.aeUnit === "×D"
+              ? catalogAe * positiveNumber(diameter)
+              : catalogAe,
             3,
           )
         : "",
@@ -207,6 +222,7 @@ export default function CuttingParametersPage({
     const teethValue = Math.max(1, positiveNumber(teeth));
     const rpmLimit = positiveNumber(maxRpm);
     const feedLimit = positiveNumber(maxFeed);
+    const radialWidth = positiveNumber(engagementWidth);
 
     const requestedRpm =
       diameterValue && vcValue
@@ -225,10 +241,27 @@ export default function CuttingParametersPage({
         ? Math.min(requestedFeed, feedLimit)
         : requestedFeed;
     const length = positiveNumber(cutLength);
+    const radialRatio =
+      diameterValue > 0
+        ? Math.min(1, radialWidth / diameterValue)
+        : 0;
+    const engagementAngleRadians =
+      radialRatio > 0
+        ? Math.acos(Math.max(-1, Math.min(1, 1 - 2 * radialRatio)))
+        : 0;
+    const chipThickness =
+      feedValue > 0 && engagementAngleRadians > 0
+        ? feedValue *
+          Math.sin(Math.min(engagementAngleRadians, Math.PI / 2))
+        : 0;
 
     return {
       rpm,
       machineFeed,
+      radialRatio,
+      engagementAngle:
+        (engagementAngleRadians * 180) / Math.PI,
+      chipThickness,
       timeMinutes:
         machineFeed > 0 && length > 0 ? length / machineFeed : 0,
       rpmLimited: rpmLimit > 0 && requestedRpm > rpmLimit,
@@ -237,6 +270,7 @@ export default function CuttingParametersPage({
   }, [
     cutLength,
     diameter,
+    engagementWidth,
     feed,
     feedMode,
     maxFeed,
@@ -251,6 +285,15 @@ export default function CuttingParametersPage({
     positiveNumber(vc) > 0 &&
     positiveNumber(feed) > 0 &&
     (operation !== "milling" || positiveNumber(teeth) > 0);
+  const tpcReady =
+    operation === "milling" &&
+    positiveNumber(diameter) > 0 &&
+    positiveNumber(feed) > 0 &&
+    positiveNumber(engagementWidth) > 0;
+  const activeCalculationReady =
+    operation === "milling" && calculationMode === "tpc"
+      ? tpcReady
+      : calculationReady;
 
   function selectMachine(value: string) {
     setMachineId(value);
@@ -266,10 +309,22 @@ export default function CuttingParametersPage({
 
   function changeOperation(nextOperation: CuttingOperation) {
     setOperation(nextOperation);
+    setCalculationMode("base");
     setQuery("");
     setToolId("");
     setMaterialId("");
     setParameterSetId("");
+  }
+
+  function resetCalculation() {
+    setDiameter("");
+    setTeeth(operation === "milling" ? "1" : "");
+    setCutLength("");
+    setVc("");
+    setFeed("");
+    setAp("");
+    setAe("");
+    setEngagementWidth("");
   }
 
   function changeCatalog(nextCatalogId: string) {
@@ -305,12 +360,14 @@ export default function CuttingParametersPage({
       </div>
 
       <section className="cuttingLayout" id="cutting-calculator">
-        <div className="panel cuttingInputs">
+        <div className="panel cuttingInputs machineDataPanel">
           <div className="cuttingSectionTitle">
             <Calculator size={19} />
             <div>
               <b>Dati di lavorazione</b>
-              <span>Scegli lavorazione, utensile e materiale.</span>
+              <span>
+                Seleziona l’articolo e inserisci i dati nelle schede.
+              </span>
             </div>
           </div>
 
@@ -331,7 +388,7 @@ export default function CuttingParametersPage({
             ))}
           </div>
 
-          <div className="cuttingFormGrid">
+          <div className="cuttingSetupGrid">
             <label className="full">
               <span>Catalogo</span>
               <select
@@ -435,40 +492,6 @@ export default function CuttingParametersPage({
             )}
 
             <label>
-              <span>
-                {operation === "turning"
-                  ? "Diametro pezzo"
-                  : "Diametro utensile"}{" "}
-                (mm)
-              </span>
-              <input
-                inputMode="decimal"
-                value={diameter}
-                onChange={(event) => setDiameter(event.target.value)}
-              />
-            </label>
-
-            {operation === "milling" && (
-              <label>
-                <span>Taglienti effettivi (Z)</span>
-                <input
-                  inputMode="numeric"
-                  value={teeth}
-                  onChange={(event) => setTeeth(event.target.value)}
-                />
-              </label>
-            )}
-
-            <label>
-              <span>Lunghezza lavorata (mm)</span>
-              <input
-                inputMode="decimal"
-                value={cutLength}
-                onChange={(event) => setCutLength(event.target.value)}
-              />
-            </label>
-
-            <label>
               <span>Profilo</span>
               <select
                 value={profile}
@@ -485,59 +508,238 @@ export default function CuttingParametersPage({
                 ))}
               </select>
             </label>
-
-            <label>
-              <span>Vc (m/min)</span>
-              <input
-                inputMode="decimal"
-                value={vc}
-                onChange={(event) => setVc(event.target.value)}
-              />
-            </label>
-
-            <label>
-              <span>
-                {feedMode === "per-tooth"
-                  ? "fz (mm/dente)"
-                  : "f (mm/giro)"}
-              </span>
-              <input
-                inputMode="decimal"
-                value={feed}
-                onChange={(event) => setFeed(event.target.value)}
-              />
-            </label>
-
-            <label>
-              <span>ap · Profondità di taglio ({apUnit})</span>
-              <input
-                inputMode="decimal"
-                placeholder="Non indicato"
-                value={ap}
-                onChange={(event) => setAp(event.target.value)}
-              />
-            </label>
-
-            <label>
-              <span>ae · Impegno radiale ({aeUnit})</span>
-              <input
-                inputMode="decimal"
-                placeholder="Non indicato"
-                value={ae}
-                onChange={(event) => setAe(event.target.value)}
-              />
-            </label>
           </div>
 
-          <div className="machineLimits">
-            <div className="cuttingSectionTitle compact">
-              <Gauge size={18} />
-              <div>
-                <b>Limiti macchina</b>
-                <span>Facoltativi, usati per gli avvisi.</span>
-              </div>
+          {operation === "milling" && (
+            <div className="calculationModeTabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={calculationMode === "base"}
+                className={calculationMode === "base" ? "active" : ""}
+                onClick={() => setCalculationMode("base")}
+              >
+                Fresatura
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={calculationMode === "tpc"}
+                className={calculationMode === "tpc" ? "active" : ""}
+                onClick={() => setCalculationMode("tpc")}
+              >
+                TPC · Spessore truciolo
+              </button>
             </div>
+          )}
 
+          <div className="machineDataIntro">
+            <div>
+              <span>Inserimento dei dati di base</span>
+              <b>
+                {operation === "milling" && calculationMode === "tpc"
+                  ? "Calcolo TPC"
+                  : operationLabels[operation]}
+              </b>
+            </div>
+            <small>I risultati si aggiornano automaticamente.</small>
+          </div>
+
+          {operation === "milling" && calculationMode === "tpc" ? (
+            <div className="machineDataGrid">
+              <MachineDataOutput
+                label="Codice articolo"
+                value={selectedTool?.article || "—"}
+                meta={selectedTool?.family || "Nessun utensile selezionato"}
+                wide
+                article
+              />
+              <MachineDataField
+                label="Diametro"
+                symbol="D"
+                value={diameter}
+                unit="mm"
+                onChange={setDiameter}
+              />
+              <MachineDataOutput
+                label="Rapporto tra ae e D"
+                value={
+                  tpcReady
+                    ? formatCuttingNumber(result.radialRatio, 3)
+                    : "0"
+                }
+              />
+              <MachineDataField
+                label="Larghezza di fresatura"
+                symbol="ae"
+                value={engagementWidth}
+                unit="mm"
+                onChange={setEngagementWidth}
+              />
+              <MachineDataField
+                label="Avanzamento al dente"
+                symbol="fz"
+                value={feed}
+                unit="mm/d"
+                onChange={setFeed}
+              />
+              <MachineDataOutput
+                label="Angolo di attacco"
+                symbol="φ"
+                value={
+                  tpcReady
+                    ? formatCuttingNumber(result.engagementAngle, 1)
+                    : "0"
+                }
+                unit="°"
+              />
+              <MachineDataOutput
+                label="Spessore massimo truciolo"
+                symbol="hmax"
+                value={
+                  tpcReady
+                    ? formatCuttingNumber(result.chipThickness, 4)
+                    : "0"
+                }
+                unit="mm"
+              />
+            </div>
+          ) : (
+            <div className="machineDataGrid">
+              <MachineDataOutput
+                label="Codice articolo"
+                value={selectedTool?.article || "—"}
+                meta={selectedTool?.family || "Nessun utensile selezionato"}
+                wide
+                article
+              />
+              <MachineDataField
+                label={
+                  operation === "turning"
+                    ? "Diametro pezzo"
+                    : "Diametro utensile"
+                }
+                symbol="D"
+                value={diameter}
+                unit="mm"
+                onChange={setDiameter}
+              />
+              {operation === "milling" ? (
+                <MachineDataField
+                  label="Taglienti"
+                  symbol="Z"
+                  value={teeth}
+                  unit=""
+                  inputMode="numeric"
+                  onChange={setTeeth}
+                />
+              ) : (
+                <MachineDataOutput
+                  label="Tipo di avanzamento"
+                  value="Per giro"
+                  meta="Valore f"
+                />
+              )}
+              <MachineDataField
+                label="Velocità di taglio"
+                symbol="Vc"
+                value={vc}
+                unit="m/min"
+                onChange={setVc}
+                wide
+              />
+              <MachineDataField
+                label={
+                  feedMode === "per-tooth"
+                    ? "Avanzamento al dente"
+                    : "Avanzamento al giro"
+                }
+                symbol={feedMode === "per-tooth" ? "fz" : "f"}
+                value={feed}
+                unit={
+                  feedMode === "per-tooth"
+                    ? "mm/d"
+                    : "mm/giro"
+                }
+                onChange={setFeed}
+                wide
+              />
+              <MachineDataOutput
+                label="Numero di giri"
+                symbol="n"
+                value={
+                  calculationReady
+                    ? formatCuttingNumber(Math.round(result.rpm), 0)
+                    : "0"
+                }
+                unit="giri/min"
+                wide
+                result
+              />
+              <MachineDataOutput
+                label="Velocità di avanzamento"
+                symbol="Vf"
+                value={
+                  calculationReady
+                    ? formatCuttingNumber(
+                        Math.round(result.machineFeed),
+                        0,
+                      )
+                    : "0"
+                }
+                unit="mm/min"
+                wide
+                result
+              />
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="newCalculationButton"
+            onClick={resetCalculation}
+          >
+            <Calculator size={18} />
+            Effettua un nuovo calcolo
+          </button>
+
+          <details className="cuttingAdvanced">
+            <summary>Parametri aggiuntivi</summary>
+            <div className="cuttingFormGrid">
+              <label>
+                <span>Lunghezza lavorata (mm)</span>
+                <input
+                  inputMode="decimal"
+                  value={cutLength}
+                  onChange={(event) => setCutLength(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>ap · Profondità ({apUnit})</span>
+                <input
+                  inputMode="decimal"
+                  placeholder="Non indicato"
+                  value={ap}
+                  onChange={(event) => setAp(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>ae · Catalogo ({aeUnit})</span>
+                <input
+                  inputMode="decimal"
+                  placeholder="Non indicato"
+                  value={ae}
+                  onChange={(event) => setAe(event.target.value)}
+                />
+              </label>
+            </div>
+          </details>
+
+          <details className="cuttingAdvanced machineLimits">
+            <summary>
+              <Gauge size={17} />
+              Limiti macchina
+            </summary>
             <div className="cuttingFormGrid">
               <label className="full">
                 <span>Macchina</span>
@@ -574,7 +776,7 @@ export default function CuttingParametersPage({
                 />
               </label>
             </div>
-          </div>
+          </details>
         </div>
 
         <div className="cuttingResults">
@@ -587,35 +789,68 @@ export default function CuttingParametersPage({
               </div>
             </div>
 
-            {calculationReady ? (
+            {activeCalculationReady ? (
               <>
                 <div className="resultGrid">
-                  <ResultCard
-                    icon={<RotateCw size={19} />}
-                    label="Mandrino"
-                    value={`${formatCuttingNumber(
-                      Math.round(result.rpm),
-                      0,
-                    )} rpm`}
-                    warning={result.rpmLimited}
-                  />
-                  <ResultCard
-                    icon={<Ruler size={19} />}
-                    label="Avanzamento"
-                    value={`${formatCuttingNumber(
-                      Math.round(result.machineFeed),
-                      0,
-                    )} mm/min`}
-                    warning={result.feedLimited}
-                  />
-                  <ResultCard
-                    icon={<Timer size={19} />}
-                    label="Tempo stimato"
-                    value={formatTime(result.timeMinutes)}
-                  />
+                  {operation === "milling" &&
+                  calculationMode === "tpc" ? (
+                    <>
+                      <ResultCard
+                        icon={<Ruler size={19} />}
+                        label="Rapporto ae/D"
+                        value={formatCuttingNumber(
+                          result.radialRatio,
+                          3,
+                        )}
+                      />
+                      <ResultCard
+                        icon={<RotateCw size={19} />}
+                        label="Angolo φ"
+                        value={`${formatCuttingNumber(
+                          result.engagementAngle,
+                          1,
+                        )}°`}
+                      />
+                      <ResultCard
+                        icon={<Gauge size={19} />}
+                        label="Spessore hmax"
+                        value={`${formatCuttingNumber(
+                          result.chipThickness,
+                          4,
+                        )} mm`}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <ResultCard
+                        icon={<RotateCw size={19} />}
+                        label="Mandrino"
+                        value={`${formatCuttingNumber(
+                          Math.round(result.rpm),
+                          0,
+                        )} rpm`}
+                        warning={result.rpmLimited}
+                      />
+                      <ResultCard
+                        icon={<Ruler size={19} />}
+                        label="Avanzamento"
+                        value={`${formatCuttingNumber(
+                          Math.round(result.machineFeed),
+                          0,
+                        )} mm/min`}
+                        warning={result.feedLimited}
+                      />
+                      <ResultCard
+                        icon={<Timer size={19} />}
+                        label="Tempo stimato"
+                        value={formatTime(result.timeMinutes)}
+                      />
+                    </>
+                  )}
                 </div>
 
-                {(result.rpmLimited || result.feedLimited) && (
+                {calculationMode !== "tpc" &&
+                  (result.rpmLimited || result.feedLimited) && (
                   <div className="limitWarning">
                     <AlertTriangle size={18} />
                     <span>
@@ -625,44 +860,72 @@ export default function CuttingParametersPage({
                   </div>
                 )}
 
-                <dl className="calculationDetails">
-                  <div>
-                    <dt>Formula giri</dt>
-                    <dd>n = (1.000 × Vc) / (π × D)</dd>
-                  </div>
-                  <div>
-                    <dt>Formula avanzamento</dt>
-                    <dd>
-                      {feedMode === "per-tooth"
-                        ? "Vf = n × Z × fz"
-                        : "Vf = n × f"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Intervallo catalogo Vc</dt>
-                    <dd>
-                      {selectedParameterSet?.vc
-                        ? `${selectedParameterSet.vc} m/min`
-                        : "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Profondità ap</dt>
-                    <dd>{ap ? `${ap} ${apUnit}` : "—"}</dd>
-                  </div>
-                  <div>
-                    <dt>Impegno ae</dt>
-                    <dd>{ae ? `${ae} ${aeUnit}` : "—"}</dd>
-                  </div>
-                </dl>
+                {operation === "milling" &&
+                calculationMode === "tpc" ? (
+                  <dl className="calculationDetails">
+                    <div>
+                      <dt>Rapporto radiale</dt>
+                      <dd>ae / D</dd>
+                    </div>
+                    <div>
+                      <dt>Angolo d’attacco</dt>
+                      <dd>φ = arccos(1 − 2 × ae/D)</dd>
+                    </div>
+                    <div>
+                      <dt>Spessore massimo</dt>
+                      <dd>hmax = fz × sin(φ)</dd>
+                    </div>
+                    <div>
+                      <dt>Codice articolo</dt>
+                      <dd>{selectedTool?.article || "—"}</dd>
+                    </div>
+                  </dl>
+                ) : (
+                  <dl className="calculationDetails">
+                    <div>
+                      <dt>Formula giri</dt>
+                      <dd>n = (1.000 × Vc) / (π × D)</dd>
+                    </div>
+                    <div>
+                      <dt>Formula avanzamento</dt>
+                      <dd>
+                        {feedMode === "per-tooth"
+                          ? "Vf = n × Z × fz"
+                          : "Vf = n × f"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Intervallo catalogo Vc</dt>
+                      <dd>
+                        {selectedParameterSet?.vc
+                          ? `${selectedParameterSet.vc} m/min`
+                          : "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Codice articolo</dt>
+                      <dd>{selectedTool?.article || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt>Profondità ap</dt>
+                      <dd>{ap ? `${ap} ${apUnit}` : "—"}</dd>
+                    </div>
+                    <div>
+                      <dt>Impegno ae</dt>
+                      <dd>{ae ? `${ae} ${aeUnit}` : "—"}</dd>
+                    </div>
+                  </dl>
+                )}
               </>
             ) : (
               <div className="resultAwaiting">
                 <Calculator size={25} />
-                <b>Scegli un utensile dalla lista</b>
+                <b>Completa i dati del calcolo</b>
                 <span>
-                  Inserisci diametro e lunghezza per ottenere giri,
-                  avanzamento e tempo stimato.
+                  {operation === "milling" &&
+                  calculationMode === "tpc"
+                    ? "Inserisci diametro, larghezza ae e avanzamento fz."
+                    : "Inserisci diametro, velocità di taglio e avanzamento."}
                 </span>
               </div>
             )}
@@ -764,6 +1027,91 @@ export default function CuttingParametersPage({
         onUseForCalculation={() => undefined}
       />
     </>
+  );
+}
+
+type MachineDataFieldProps = {
+  label: string;
+  symbol?: string;
+  value: string;
+  unit: string;
+  onChange: (value: string) => void;
+  inputMode?: "decimal" | "numeric";
+  wide?: boolean;
+};
+
+function MachineDataField({
+  label,
+  symbol,
+  value,
+  unit,
+  onChange,
+  inputMode = "decimal",
+  wide = false,
+}: MachineDataFieldProps) {
+  return (
+    <label className={`machineDataCard ${wide ? "wide" : ""}`}>
+      <span>
+        {label}
+        {symbol ? ` [${symbol}]` : ""}
+      </span>
+      <div>
+        <input
+          aria-label={`${label}${symbol ? ` ${symbol}` : ""}`}
+          inputMode={inputMode}
+          placeholder="0"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        {unit && <b>{unit}</b>}
+      </div>
+    </label>
+  );
+}
+
+type MachineDataOutputProps = {
+  label: string;
+  value: string;
+  symbol?: string;
+  unit?: string;
+  meta?: string;
+  wide?: boolean;
+  article?: boolean;
+  result?: boolean;
+};
+
+function MachineDataOutput({
+  label,
+  value,
+  symbol,
+  unit = "",
+  meta,
+  wide = false,
+  article = false,
+  result = false,
+}: MachineDataOutputProps) {
+  return (
+    <div
+      className={[
+        "machineDataCard",
+        "output",
+        wide ? "wide" : "",
+        article ? "article" : "",
+        result ? "calculated" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <span>
+        {label}
+        {symbol ? ` [${symbol}]` : ""}
+      </span>
+      <div>
+        <strong>{value}</strong>
+        {unit && <b>{unit}</b>}
+      </div>
+      {meta && <small>{meta}</small>}
+    </div>
   );
 }
 
