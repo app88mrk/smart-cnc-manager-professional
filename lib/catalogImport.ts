@@ -63,9 +63,6 @@ export type CatalogToolRecord = {
   brand: string;
   toolMaterial: string;
   diameter: string;
-  diameterMin?: string;
-  diameterMax?: string;
-  diameters?: string[];
   radius: string;
   teeth: string;
   materials: string[];
@@ -94,9 +91,6 @@ export type CatalogCalculationSelection = {
   aeUnit?: string;
   profile?: "conservative" | "standard" | "productive";
   diameter?: string;
-  diameterMin?: string;
-  diameterMax?: string;
-  diameters?: string[];
   radius?: string;
   teeth?: string;
   toolMaterial?: string;
@@ -142,7 +136,7 @@ const DB_NAME = "smart-cnc-manager-catalogs";
 const DB_VERSION = 1;
 const CATALOG_STORE = "catalogs";
 const MAX_PAGE_TEXT_LENGTH = 30_000;
-const TOOL_INDEX_VERSION = 2;
+const TOOL_INDEX_VERSION = 1;
 const BUILT_IN_CATALOG_URLS = [
   "/data/catalogo-hoffmann-56-90025000.json",
 ];
@@ -455,7 +449,7 @@ export function searchCatalogPages(
 
 export function catalogToolsFromCatalogs(
   catalogs: ImportedCatalog[],
-): CatalogToolRecord[] {
+) {
   return catalogs.flatMap((catalog) =>
     catalog.toolIndexVersion === TOOL_INDEX_VERSION &&
     catalog.tools?.length
@@ -469,7 +463,7 @@ export function catalogToolsFromCatalogs(
 export function buildCatalogToolsFromPage(
   page: CatalogPageRecord,
   catalogName: string,
-): CatalogToolRecord[] {
+) {
   const operations = inferPageOperations(page);
   if (!operations.length) {
     return [] as CatalogToolRecord[];

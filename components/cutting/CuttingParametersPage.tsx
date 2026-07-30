@@ -144,19 +144,8 @@ export default function CuttingParametersPage({
       return;
     }
 
-    const catalogDiameter = preferredToolDiameter(selectedTool);
-    if (catalogDiameter) {
-      setDiameter((currentDiameter) => {
-        const current = positiveNumber(currentDiameter);
-        const minimum = positiveNumber(selectedTool.diameterMin || catalogDiameter);
-        const maximum = positiveNumber(
-          selectedTool.diameterMax || selectedTool.diameterMin || catalogDiameter,
-        );
-
-        return current >= minimum && current <= maximum
-          ? currentDiameter
-          : catalogDiameter;
-      });
+    if (selectedTool.diameter) {
+      setDiameter(selectedTool.diameter);
     }
     if (selectedTool.teeth) {
       setTeeth(selectedTool.teeth);
@@ -457,11 +446,6 @@ export default function CuttingParametersPage({
                 value={diameter}
                 onChange={(event) => setDiameter(event.target.value)}
               />
-              {selectedTool && toolDiameterLabel(selectedTool) && (
-                <small className="catalogDiameterHint">
-                  Campo catalogo: {toolDiameterLabel(selectedTool)}
-                </small>
-              )}
             </label>
 
             {operation === "milling" && (
@@ -702,9 +686,6 @@ export default function CuttingParametersPage({
                 {selectedTool.radius && (
                   <span>R {selectedTool.radius} mm</span>
                 )}
-                {toolDiameterLabel(selectedTool) && (
-                  <span>{toolDiameterLabel(selectedTool)}</span>
-                )}
                 {materialId && (
                   <span>{materialLabel(materialId)}</span>
                 )}
@@ -862,54 +843,11 @@ function toolOptionLabel(tool: CatalogToolRecord) {
   return [
     tool.article,
     tool.family && tool.family !== tool.article ? tool.family : "",
-    toolDiameterLabel(tool),
     tool.radius ? `R ${tool.radius}` : "",
     `pag. ${tool.page}`,
   ]
     .filter(Boolean)
     .join(" · ");
-}
-
-function toolDiameterLabel(tool: CatalogToolRecord) {
-  const exact = formatCatalogNumber(tool.diameter);
-  if (exact) {
-    return `Ø ${exact} mm`;
-  }
-
-  const minimum = formatCatalogNumber(tool.diameterMin);
-  const maximum = formatCatalogNumber(tool.diameterMax);
-  if (!minimum && !maximum) {
-    return "";
-  }
-
-  if (!maximum || minimum === maximum) {
-    return `Ø ${minimum || maximum} mm`;
-  }
-
-  return `Ø ${minimum}–${maximum} mm`;
-}
-
-function preferredToolDiameter(tool: CatalogToolRecord) {
-  return (
-    formatCatalogNumber(tool.diameter) ||
-    formatCatalogNumber(tool.diameterMin) ||
-    formatCatalogNumber(tool.diameters?.[0])
-  );
-}
-
-function formatCatalogNumber(value?: string) {
-  if (!value) {
-    return "";
-  }
-
-  const parsed = Number(value.replace(",", "."));
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return "";
-  }
-
-  return new Intl.NumberFormat("it-IT", {
-    maximumFractionDigits: 4,
-  }).format(parsed);
 }
 
 function materialLabel(material: string) {
