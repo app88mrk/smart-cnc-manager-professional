@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { ChangeEvent, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  BookOpen,
   Calculator,
   Database,
+  Download,
+  FileUp,
   Save,
 } from "lucide-react";
 
@@ -47,8 +50,13 @@ type Props = {
   machines: Machine[];
   busy: boolean;
   saveJob: (record: RecordItem) => Promise<void>;
+  saveCatalog: (record: RecordItem, file: File) => Promise<void>;
   notifySuccess: (message: string) => void;
 };
+
+const catalogMarker = "[CATALOGO_PARAMETRI]";
+const calculationMarker = "[CALCOLO_PARAMETRI_V5]";
+const maximumUploadSize = 500 * 1024 * 1024;
 
 const operationLabels: Record<CuttingOperation, string> = {
   milling: "Fresatura",
@@ -58,17 +66,17 @@ const operationLabels: Record<CuttingOperation, string> = {
 
 const initialValues: CalculatorValues = {
   articleCode: "",
-  diameter: "10",
-  teeth: "4",
-  cuttingSpeed: "120",
-  feedPerTooth: "0,05",
-  feedPerRev: "0,12",
-  axialDepth: "2",
-  radialWidth: "5",
-  length: "50",
-  passes: "1",
-  approachAngle: "90",
-  targetChipThickness: "0,05",
+  diameter: "0",
+  teeth: "0",
+  cuttingSpeed: "0",
+  feedPerTooth: "0",
+  feedPerRev: "0",
+  axialDepth: "0",
+  radialWidth: "0",
+  length: "0",
+  passes: "0",
+  approachAngle: "0",
+  targetChipThickness: "0",
 };
 
 export default function CuttingParametersPage({
@@ -76,6 +84,7 @@ export default function CuttingParametersPage({
   machines,
   busy,
   saveJob,
+  saveCatalog,
   notifySuccess,
 }: Props) {
   const tools = useMemo(
@@ -86,6 +95,25 @@ export default function CuttingParametersPage({
     () => records.filter((record) => record.module === "materials"),
     [records]
   );
+  const catalogs = useMemo(
+    () =>
+      records.filter(
+        (record) =>
+          record.module === "manuals" &&
+          record.notes.includes(catalogMarker)
+      ),
+    [records]
+  );
+  const savedCalculations = useMemo(
+    () =>
+      records.filter(
+        (record) =>
+          record.module === "jobs" &&
+          (record.notes.includes(calculationMarker) ||
+            /^(Fresatura|Foratura|Tornitura)\s*·/i.test(record.title))
+      ),
+    [records]
+  );
 
   const [tab, setTab] = useState<CalculatorTab>("milling");
   const [operation, setOperation] =
@@ -93,11 +121,13 @@ export default function CuttingParametersPage({
   const [selectedToolId, setSelectedToolId] = useState("");
   const [selectedMaterialId, setSelectedMaterialId] = useState("");
   const [selectedMachineId, setSelectedMachineId] = useState("");
+  const [selectedCatalogId, setSelectedCatalogId] = useState("");
   const [materialGroup, setMaterialGroup] =
     useState<MaterialIsoGroup>("P");
   const [values, setValues] =
     useState<CalculatorValues>(initialValues);
   const [localError, setLocalError] = useState("");
+  const [catalogError, setCatalogError] = useState("");
 
   const numeric = useMemo(
     () => ({
@@ -121,12 +151,15 @@ export default function CuttingParametersPage({
     operation === "milling"
       ? numeric.feedPerTooth
       : numeric.feedPerRev;
-  const feed = calculateFeed(
-    operation,
-    rpm,
-    activeFeedValue,
-    numeric.teeth
-  );
+  const feed =
+    operation === "milling" && numeric.teeth <= 0
+      ? 0
+      : calculateFeed(
+          operation,
+          rpm,
+          activeFeedValue,
+          numeric.teeth
+        );
   const machiningTime = calculateMachiningTime(
     numeric.length,
     feed,
@@ -248,16 +281,22 @@ export default function CuttingParametersPage({
       (item) => item.id === selectedMaterialId
     );
     const tool = tools.find((item) => item.id === selectedToolId);
+    const catalog = catalogs.find(
+      (item) => item.id === selectedCatalogId
+    );
     const code = values.articleCode.trim() || "Manuale";
     const operationLabel = operationLabels[operation];
 
     const notes = [
+      calculationMarker,
+      `Tipo calcolo: ${operation}`,
       `Operazione: ${operationLabel}`,
       `Codice articolo: ${code}`,
       tool ? `Utensile: ${tool.title}` : "Utensile: inserimento manuale",
       material
         ? `Materiale: ${material.title} (ISO ${materialGroup})`
         : `Materiale: manuale (ISO ${materialGroup})`,
+      catalog ? `Catalogo di riferimento: ${catalog.title}` : "",
       `Diametro: ${formatNumber(numeric.diameter)} mm`,
       operation === "milling"
         ? `Taglienti: ${formatNumber(numeric.teeth)}`
@@ -300,6 +339,54 @@ export default function CuttingParametersPage({
       notifySuccess(
         `Calcolo ${operationLabel.toLowerCase()} salvato nelle Lavorazioni.`
       );
+    } catch {
+      // L'errore viene già mostrato da useRecords.
+    }
+  }
+
+  async function handleCatalogUpload(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setCatalogError("");
+
+    if (!file.size) {
+      setCatalogError("Il catalogo selezionato è vuoto.");
+      return;
+    }
+
+    if (file.size > maximumUploadSize) {
+      setCatalogError("Il catalogo non può superare 500 MB.");
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const id = createId("catalog");
+
+    try {
+      await saveCatalog(
+        {
+          id,
+          module: "manuals",
+          title: file.name.replace(/\.[^.]+$/, ""),
+          subtitle: "Catalogo parametri di taglio",
+          status: "Disponibile",
+          machineId: "",
+          machine: "",
+          notes: `${catalogMarker}\nCatalogo caricato dalla sezione Parametri di taglio.`,
+          createdAt: now,
+          updatedAt: now,
+        },
+        file
+      );
+      setSelectedCatalogId(id);
+      notifySuccess(`Catalogo “${file.name}” caricato correttamente.`);
     } catch {
       // L'errore viene già mostrato da useRecords.
     }
@@ -400,6 +487,23 @@ export default function CuttingParametersPage({
               ))}
             </select>
           </label>
+
+          <label>
+            <span>Catalogo di riferimento</span>
+            <select
+              value={selectedCatalogId}
+              onChange={(event) =>
+                setSelectedCatalogId(event.target.value)
+              }
+            >
+              <option value="">Nessun catalogo</option>
+              {catalogs.map((catalog) => (
+                <option key={catalog.id} value={catalog.id}>
+                  {catalog.title}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <label className="cuttingArticleCode">
@@ -413,6 +517,68 @@ export default function CuttingParametersPage({
           />
         </label>
       </div>
+
+      <section className="cuttingCatalogPanel">
+        <div className="cuttingCatalogHead">
+          <div>
+            <BookOpen size={19} />
+            <div>
+              <b>Archivio cataloghi</b>
+              <small>PDF, CSV, Excel, JSON, TSV e file di testo fino a 500 MB</small>
+            </div>
+          </div>
+
+          <label className={`cuttingCatalogUpload ${busy ? "disabled" : ""}`}>
+            <FileUp size={17} />
+            {busy ? "Caricamento…" : "Carica catalogo"}
+            <input
+              type="file"
+              accept=".pdf,.csv,.xlsx,.xls,.json,.tsv,.txt"
+              disabled={busy}
+              onChange={handleCatalogUpload}
+            />
+          </label>
+        </div>
+
+        {catalogError && (
+          <div className="cuttingWarning error">
+            <AlertTriangle size={18} />
+            {catalogError}
+          </div>
+        )}
+
+        {catalogs.length ? (
+          <div className="cuttingCatalogList">
+            {catalogs.map((catalog) => (
+              <article key={catalog.id}>
+                <div>
+                  <b>{catalog.title}</b>
+                  <small>
+                    {catalog.fileName || "Catalogo"}
+                    {catalog.fileSize
+                      ? ` · ${formatBytes(catalog.fileSize)}`
+                      : ""}
+                  </small>
+                </div>
+                {catalog.fileUrl && (
+                  <a
+                    href={catalog.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Apri catalogo"
+                  >
+                    <Download size={16} />
+                  </a>
+                )}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="cuttingCatalogEmpty">
+            Nessun catalogo caricato. Puoi comunque usare il calcolo manuale.
+          </p>
+        )}
+      </section>
 
       <div className="cuttingTabs" role="tablist" aria-label="Calcoli disponibili">
         {([
@@ -538,6 +704,11 @@ export default function CuttingParametersPage({
           </div>
         )}
 
+        <SavedCalculations
+          records={savedCalculations}
+          operation={operation}
+        />
+
         <div className="cuttingActions">
           <div>
             <b>{operationLabels[operation]}</b>
@@ -554,6 +725,57 @@ export default function CuttingParametersPage({
           </button>
         </div>
       </div>
+    </section>
+  );
+}
+
+function SavedCalculations({
+  records,
+  operation,
+}: {
+  records: RecordItem[];
+  operation: CuttingOperation;
+}) {
+  const matchingRecords = records
+    .filter((record) => savedOperation(record) === operation)
+    .slice(0, 12);
+
+  return (
+    <section className="cuttingSaved">
+      <div className="cuttingSavedHead">
+        <div>
+          <span>STORICO DEL CALCOLO</span>
+          <h3>Calcoli {operationLabels[operation].toLowerCase()} salvati</h3>
+        </div>
+        <b>{matchingRecords.length}</b>
+      </div>
+
+      {matchingRecords.length ? (
+        <div className="cuttingSavedGrid">
+          {matchingRecords.map((record) => {
+            const code =
+              record.notes.match(/Codice articolo:\s*(.+)/i)?.[1] ||
+              "Manuale";
+
+            return (
+              <article key={record.id}>
+                <div className="cuttingSavedTop">
+                  <span>{code}</span>
+                  <small>{formatDateTime(record.updatedAt)}</small>
+                </div>
+                <b>{record.title}</b>
+                <p>{record.subtitle}</p>
+                {record.machine && <small>Macchina: {record.machine}</small>}
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="cuttingSavedEmpty">
+          Nessun calcolo salvato per {operationLabels[operation].toLowerCase()}.
+          Il prossimo comparirà qui automaticamente.
+        </p>
+      )}
     </section>
   );
 }
@@ -733,4 +955,49 @@ function formatNumber(value: number, decimals = 0) {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(Number.isFinite(value) ? value : 0);
+}
+
+function savedOperation(record: RecordItem): CuttingOperation | null {
+  const explicit = record.notes.match(
+    /Tipo calcolo:\s*(milling|drilling|turning)/i
+  )?.[1];
+
+  if (explicit) {
+    return explicit.toLowerCase() as CuttingOperation;
+  }
+
+  if (/^Fresatura\s*·/i.test(record.title)) return "milling";
+  if (/^Foratura\s*·/i.test(record.title)) return "drilling";
+  if (/^Tornitura\s*·/i.test(record.title)) return "turning";
+  return null;
+}
+
+function createId(prefix: string) {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${prefix}-${Date.now()}`;
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Data non disponibile";
+  }
+
+  return new Intl.DateTimeFormat("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

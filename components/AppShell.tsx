@@ -390,6 +390,12 @@ export default function AppShell() {
                 attachment: null,
               });
             }}
+            saveCatalog={async (record, file) => {
+              await saveRecord({
+                record,
+                attachment: file,
+              });
+            }}
           />
         ) : isRecordModuleId(active) ? (
           <RecordsPage

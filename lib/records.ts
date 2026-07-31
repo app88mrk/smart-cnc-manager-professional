@@ -17,7 +17,7 @@ import {
 import { db, storage } from "@/lib/firebase";
 import { RecordItem } from "@/types";
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const MAX_FILE_SIZE = 500 * 1024 * 1024;
 const localKey = (uid: string) => `smart-cnc-records-${uid}`;
 
 function readLocal(uid: string): RecordItem[] {
@@ -74,7 +74,7 @@ export async function saveRecord(
     }
 
     if (attachment.size > MAX_FILE_SIZE) {
-      throw new Error("Il file supera il limite di 100 MB.");
+      throw new Error("Il file supera il limite di 500 MB.");
     }
 
     if (saved.filePath) {
