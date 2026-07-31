@@ -4,6 +4,7 @@ export const modules: ModuleDefinition[] = [
   { id:"machines", label:"Macchine", description:"Schede tecniche e documentazione", icon:"▦", state:"active" },
   { id:"manuals", label:"Manuali", description:"PDF, immagini, video e documenti", icon:"▤", state:"active" },
   { id:"tools", label:"Utensili", description:"Anagrafica, scorte e vita utensile", icon:"⚙", state:"active" },
+  { id:"cutting", label:"Parametri di taglio", description:"Fresatura, foratura, tornitura e potenza", icon:"∑", state:"active" },
   { id:"jobs", label:"Lavorazioni", description:"Cicli, programmi, utensili e risultati", icon:"◫", state:"active" },
   { id:"alarms", label:"Allarmi", description:"Cause, soluzioni e storico", icon:"⚠", state:"active" },
   { id:"maintenance", label:"Manutenzioni", description:"Scadenze, ricambi e interventi", icon:"◆", state:"active" },

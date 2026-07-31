@@ -8,6 +8,7 @@ import BackupControls from "@/components/common/BackupControls";
 import ComingSoon from "@/components/common/ComingSoon";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import FeedbackBanner from "@/components/common/FeedbackBanner";
+import CuttingParametersPage from "@/components/cutting/CuttingParametersPage";
 import Dashboard from "@/components/dashboard/Dashboard";
 import MachineDetail from "@/components/machines/MachineDetail";
 import MachineForm from "@/components/machines/MachineForm";
@@ -376,6 +377,19 @@ export default function AppShell() {
                 item: record,
               })
             }
+          />
+        ) : active === "cutting" ? (
+          <CuttingParametersPage
+            records={records}
+            machines={machines}
+            busy={recordsLoading}
+            notifySuccess={showSuccess}
+            saveJob={async (record) => {
+              await saveRecord({
+                record,
+                attachment: null,
+              });
+            }}
           />
         ) : isRecordModuleId(active) ? (
           <RecordsPage
