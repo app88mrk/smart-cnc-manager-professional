@@ -8,7 +8,9 @@ import {
   Database,
   Download,
   FileUp,
+  Pencil,
   Save,
+  X,
 } from "lucide-react";
 
 import {
@@ -49,7 +51,8 @@ type Props = {
   records: RecordItem[];
   machines: Machine[];
   busy: boolean;
-  saveJob: (record: RecordItem) => Promise<void>;
+  saveCalculation: (record: RecordItem) => Promise<void>;
+  deleteCalculation: (record: RecordItem) => Promise<void>;
   saveCatalog: (record: RecordItem, file: File) => Promise<void>;
   notifySuccess: (message: string) => void;
 };
@@ -83,7 +86,8 @@ export default function CuttingParametersPage({
   records,
   machines,
   busy,
-  saveJob,
+  saveCalculation,
+  deleteCalculation,
   saveCatalog,
   notifySuccess,
 }: Props) {
@@ -108,9 +112,10 @@ export default function CuttingParametersPage({
     () =>
       records.filter(
         (record) =>
-          record.module === "jobs" &&
-          (record.notes.includes(calculationMarker) ||
-            /^(Fresatura|Foratura|Tornitura)\s*·/i.test(record.title))
+          record.module === "cutting" ||
+          (record.module === "jobs" &&
+            (record.notes.includes(calculationMarker) ||
+              /^(Fresatura|Foratura|Tornitura)\s*·/i.test(record.title)))
       ),
     [records]
   );
@@ -126,6 +131,9 @@ export default function CuttingParametersPage({
     useState<MaterialIsoGroup>("P");
   const [values, setValues] =
     useState<CalculatorValues>(initialValues);
+  const [calculationName, setCalculationName] = useState("");
+  const [editingCalculationId, setEditingCalculationId] =
+    useState("");
   const [localError, setLocalError] = useState("");
   const [catalogError, setCatalogError] = useState("");
 
@@ -265,7 +273,76 @@ export default function CuttingParametersPage({
     }
   }
 
+  function resetCalculationForm() {
+    setValues(initialValues);
+    setCalculationName("");
+    setEditingCalculationId("");
+    setSelectedToolId("");
+    setSelectedMaterialId("");
+    setSelectedMachineId("");
+    setSelectedCatalogId("");
+    setMaterialGroup("P");
+    setLocalError("");
+  }
+
+  function editSavedCalculation(record: RecordItem) {
+    const savedType = savedOperation(record);
+
+    if (!savedType) {
+      return;
+    }
+
+    setOperation(savedType);
+    setTab(savedType);
+    setCalculationName(record.title);
+    setEditingCalculationId(record.id);
+    setSelectedMachineId(record.machineId || "");
+    setSelectedToolId(savedText(record.notes, "Utensile ID"));
+    setSelectedMaterialId(savedText(record.notes, "Materiale ID"));
+    setSelectedCatalogId(savedText(record.notes, "Catalogo ID"));
+    setMaterialGroup(savedMaterialGroup(record.notes));
+    setValues({
+      articleCode: savedText(record.notes, "Codice articolo"),
+      diameter: savedNumber(record.notes, "Diametro"),
+      teeth: savedNumber(record.notes, "Taglienti"),
+      cuttingSpeed: savedNumber(record.notes, "Vc"),
+      feedPerTooth: savedNumber(record.notes, "fz"),
+      feedPerRev: savedNumber(record.notes, "f"),
+      axialDepth: savedNumber(record.notes, "ap"),
+      radialWidth: savedNumber(record.notes, "ae"),
+      length: savedNumber(record.notes, "Lunghezza lavorata"),
+      passes: savedNumber(record.notes, "Numero passate"),
+      approachAngle: savedNumber(record.notes, "Angolo di attacco"),
+      targetChipThickness: savedNumber(record.notes, "hmax desiderato"),
+    });
+    setLocalError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function removeSavedCalculation(record: RecordItem) {
+    if (!window.confirm(`Eliminare il calcolo “${record.title}”?`)) {
+      return;
+    }
+
+    try {
+      await deleteCalculation(record);
+
+      if (editingCalculationId === record.id) {
+        resetCalculationForm();
+      }
+
+      notifySuccess(`Calcolo “${record.title}” eliminato dallo storico.`);
+    } catch {
+      // L'errore viene già mostrato da useRecords.
+    }
+  }
+
   async function handleSave() {
+    if (!calculationName.trim()) {
+      setLocalError("Inserisci un nome per il calcolo prima di salvarlo.");
+      return;
+    }
+
     if (!validCalculation) {
       setLocalError(
         "Inserisci diametro, velocità di taglio e avanzamento validi prima di salvare."
@@ -286,12 +363,18 @@ export default function CuttingParametersPage({
     );
     const code = values.articleCode.trim() || "Manuale";
     const operationLabel = operationLabels[operation];
+    const existingRecord = savedCalculations.find(
+      (record) => record.id === editingCalculationId
+    );
 
     const notes = [
       calculationMarker,
       `Tipo calcolo: ${operation}`,
       `Operazione: ${operationLabel}`,
       `Codice articolo: ${code}`,
+      selectedToolId ? `Utensile ID: ${selectedToolId}` : "",
+      selectedMaterialId ? `Materiale ID: ${selectedMaterialId}` : "",
+      selectedCatalogId ? `Catalogo ID: ${selectedCatalogId}` : "",
       tool ? `Utensile: ${tool.title}` : "Utensile: inserimento manuale",
       material
         ? `Materiale: ${material.title} (ISO ${materialGroup})`
@@ -311,6 +394,10 @@ export default function CuttingParametersPage({
       operation === "milling"
         ? `ae: ${formatNumber(numeric.radialWidth)} mm`
         : "",
+      `Lunghezza lavorata: ${formatNumber(numeric.length)} mm`,
+      `Numero passate: ${formatNumber(numeric.passes)}`,
+      `Angolo di attacco: ${formatNumber(numeric.approachAngle, 2)}°`,
+      `hmax desiderato: ${formatNumber(numeric.targetChipThickness, 3)} mm`,
       `MRR: ${formatNumber(mrr, 2)} cm³/min`,
       `Potenza stimata: ${formatNumber(power, 2)} kW`,
       machiningTime > 0
@@ -321,24 +408,24 @@ export default function CuttingParametersPage({
       .join("\n");
 
     try {
-      await saveJob({
-        id:
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `cutting-${Date.now()}`,
-        module: "jobs",
-        title: `${operationLabel} · ${code}`,
-        subtitle: `n ${formatNumber(rpm)} rpm · Vf ${formatNumber(feed)} mm/min`,
-        status: "Completata",
+      await saveCalculation({
+        id: editingCalculationId || createId("cutting"),
+        module: "cutting",
+        title: calculationName.trim(),
+        subtitle: `${operationLabel} · ${code} · n ${formatNumber(rpm)} rpm · Vf ${formatNumber(feed)} mm/min`,
+        status: "Salvato",
         machineId: selectedMachineId,
         machine: machineName,
         notes,
-        createdAt: now,
+        createdAt: existingRecord?.createdAt || now,
         updatedAt: now,
       });
       notifySuccess(
-        `Calcolo ${operationLabel.toLowerCase()} salvato nelle Lavorazioni.`
+        editingCalculationId
+          ? `Calcolo “${calculationName.trim()}” modificato.`
+          : `Calcolo “${calculationName.trim()}” salvato nello storico.`
       );
+      resetCalculationForm();
     } catch {
       // L'errore viene già mostrato da useRecords.
     }
@@ -707,22 +794,49 @@ export default function CuttingParametersPage({
         <SavedCalculations
           records={savedCalculations}
           operation={operation}
+          busy={busy}
+          onEdit={editSavedCalculation}
+          onDelete={removeSavedCalculation}
         />
 
         <div className="cuttingActions">
-          <div>
-            <b>{operationLabels[operation]}</b>
-            <small>Il salvataggio crea una scheda nelle Lavorazioni.</small>
+          <label className="cuttingSaveName">
+            <span>Nome del calcolo *</span>
+            <input
+              value={calculationName}
+              onChange={(event) => {
+                setCalculationName(event.target.value);
+                setLocalError("");
+              }}
+              placeholder={`Es. ${operationLabels[operation]} supporto 125`}
+              maxLength={80}
+            />
+          </label>
+
+          <div className="cuttingSaveButtons">
+            {editingCalculationId && (
+              <button
+                type="button"
+                onClick={resetCalculationForm}
+                disabled={busy}
+              >
+                Annulla modifica
+              </button>
+            )}
+            <button
+              type="button"
+              className="primary"
+              onClick={handleSave}
+              disabled={busy || !validCalculation}
+            >
+              <Save size={17} />
+              {busy
+                ? "Salvataggio…"
+                : editingCalculationId
+                  ? "Salva modifiche"
+                  : "Salva nello storico"}
+            </button>
           </div>
-          <button
-            type="button"
-            className="primary"
-            onClick={handleSave}
-            disabled={busy || !validCalculation}
-          >
-            <Save size={17} />
-            {busy ? "Salvataggio…" : "Salva calcolo"}
-          </button>
         </div>
       </div>
     </section>
@@ -732,9 +846,15 @@ export default function CuttingParametersPage({
 function SavedCalculations({
   records,
   operation,
+  busy,
+  onEdit,
+  onDelete,
 }: {
   records: RecordItem[];
   operation: CuttingOperation;
+  busy: boolean;
+  onEdit: (record: RecordItem) => void;
+  onDelete: (record: RecordItem) => void | Promise<void>;
 }) {
   const matchingRecords = records
     .filter((record) => savedOperation(record) === operation)
@@ -766,6 +886,28 @@ function SavedCalculations({
                 <b>{record.title}</b>
                 <p>{record.subtitle}</p>
                 {record.machine && <small>Macchina: {record.machine}</small>}
+                <div className="cuttingSavedActions">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(record)}
+                    disabled={busy}
+                    title="Modifica calcolo"
+                    aria-label={`Modifica ${record.title}`}
+                  >
+                    <Pencil size={15} />
+                    Modifica
+                  </button>
+                  <button
+                    type="button"
+                    className="delete"
+                    onClick={() => onDelete(record)}
+                    disabled={busy}
+                    title="Elimina calcolo"
+                    aria-label={`Elimina ${record.title}`}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </article>
             );
           })}
@@ -970,6 +1112,24 @@ function savedOperation(record: RecordItem): CuttingOperation | null {
   if (/^Foratura\s*·/i.test(record.title)) return "drilling";
   if (/^Tornitura\s*·/i.test(record.title)) return "turning";
   return null;
+}
+
+function savedText(notes: string, label: string) {
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = notes.match(
+    new RegExp(`(?:^|\\n)${escapedLabel}:\\s*(.+)$`, "im")
+  );
+  return match?.[1]?.trim() || "";
+}
+
+function savedNumber(notes: string, label: string) {
+  const value = savedText(notes, label).match(/-?\d+(?:[.,]\d+)?/)?.[0];
+  return value || "0";
+}
+
+function savedMaterialGroup(notes: string): MaterialIsoGroup {
+  const match = notes.match(/\bISO\s+([PMKNSH])\b/i)?.[1];
+  return (match?.toUpperCase() as MaterialIsoGroup) || "P";
 }
 
 function createId(prefix: string) {

@@ -13,6 +13,7 @@ export type ModuleId =
 export type RecordModuleId =
   | "manuals"
   | "tools"
+  | "cutting"
   | "jobs"
   | "alarms"
   | "notes"

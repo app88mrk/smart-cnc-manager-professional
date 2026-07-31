@@ -38,6 +38,16 @@ export const recordModuleConfigs: Record<
     statuses: ["Disponibile", "In uso", "Da riaffilare", "Dismesso"],
     attachments: false,
   },
+  cutting: {
+    id: "cutting",
+    eyebrow: "PARAMETRI DI TAGLIO",
+    singular: "calcolo",
+    titleLabel: "Nome calcolo",
+    subtitleLabel: "Risultati principali",
+    notesLabel: "Parametri salvati",
+    statuses: ["Salvato"],
+    attachments: false,
+  },
   jobs: {
     id: "jobs",
     eyebrow: "GESTIONE LAVORAZIONI",

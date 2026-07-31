@@ -158,6 +158,10 @@ export default function AppShell() {
       records.filter(
         (record) =>
           record.module === active &&
+          !(
+            active === "jobs" &&
+            isCuttingHistoryRecord(record)
+          ) &&
           JSON.stringify(record)
             .toLowerCase()
             .includes(queryText.toLowerCase())
@@ -384,11 +388,14 @@ export default function AppShell() {
             machines={machines}
             busy={recordsLoading}
             notifySuccess={showSuccess}
-            saveJob={async (record) => {
+            saveCalculation={async (record) => {
               await saveRecord({
                 record,
                 attachment: null,
               });
+            }}
+            deleteCalculation={async (record) => {
+              await deleteRecord(record);
             }}
             saveCatalog={async (record, file) => {
               await saveRecord({
@@ -571,4 +578,11 @@ function errorMessage(error: unknown) {
   }
 
   return "Si è verificato un errore.";
+}
+
+function isCuttingHistoryRecord(record: RecordItem) {
+  return (
+    record.notes.includes("[CALCOLO_PARAMETRI_V5]") ||
+    /^(Fresatura|Foratura|Tornitura)\s*·/i.test(record.title)
+  );
 }
