@@ -160,6 +160,10 @@ export default function AppShell() {
         (record) =>
           record.module === active &&
           !(
+            active === "tools" &&
+            record.notes.includes("[IMPORT_CATALOGO]")
+          ) &&
+          !(
             active === "jobs" &&
             isCuttingHistoryRecord(record)
           ) &&
@@ -406,7 +410,7 @@ export default function AppShell() {
                 onUploadProgress,
               });
             }}
-            saveImportedTools={saveRecords}
+            saveImportedParameters={saveRecords}
           />
         ) : isRecordModuleId(active) ? (
           <RecordsPage

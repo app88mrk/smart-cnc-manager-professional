@@ -56,7 +56,7 @@ type Props = {
     file: File,
     onUploadProgress: (percent: number) => void
   ) => Promise<void>;
-  saveImportedTools: (
+  saveImportedParameters: (
     records: RecordItem[],
     onProgress?: (percent: number) => void
   ) => Promise<void>;
@@ -94,11 +94,16 @@ export default function CuttingParametersPage({
   saveCalculation,
   deleteCalculation,
   saveCatalog,
-  saveImportedTools,
+  saveImportedParameters,
   notifySuccess,
 }: Props) {
   const tools = useMemo(
-    () => records.filter((record) => record.module === "tools"),
+    () =>
+      records.filter(
+        (record) =>
+          record.module === "tools" &&
+          !record.notes.includes("[IMPORT_CATALOGO]")
+      ),
     [records]
   );
   const materials = useMemo(
@@ -563,11 +568,11 @@ export default function CuttingParametersPage({
       </div>
 
       <CatalogImporter
-        existingTools={tools}
+        existingCalculations={savedCalculations}
         catalogs={catalogs}
         busy={busy}
         saveCatalog={saveCatalog}
-        saveImportedTools={saveImportedTools}
+        saveImportedParameters={saveImportedParameters}
         notifySuccess={notifySuccess}
         selectCatalog={setSelectedCatalogId}
       />
@@ -761,9 +766,19 @@ function SavedCalculations({
   onEdit: (record: RecordItem) => void;
   onDelete: (record: RecordItem) => void | Promise<void>;
 }) {
+  const [query, setQuery] = useState("");
+  const [visibleLimit, setVisibleLimit] = useState(24);
   const matchingRecords = records
-    .filter((record) => savedOperation(record) === operation)
-    .slice(0, 12);
+    .filter((record) => savedOperation(record) === operation);
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredRecords = normalizedQuery
+    ? matchingRecords.filter((record) =>
+        `${record.title} ${record.subtitle} ${record.notes}`
+          .toLowerCase()
+          .includes(normalizedQuery)
+      )
+    : matchingRecords;
+  const visibleRecords = filteredRecords.slice(0, visibleLimit);
 
   return (
     <section className="cuttingSaved">
@@ -775,9 +790,27 @@ function SavedCalculations({
         <b>{matchingRecords.length}</b>
       </div>
 
-      {matchingRecords.length ? (
+      {matchingRecords.length > 12 && (
+        <div className="cuttingHistorySearch">
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setVisibleLimit(24);
+            }}
+            placeholder="Cerca codice articolo, descrizione, Vc o avanzamento…"
+            aria-label="Cerca nello storico del calcolo"
+          />
+          <small>
+            {filteredRecords.length} risultati
+          </small>
+        </div>
+      )}
+
+      {filteredRecords.length ? (
         <div className="cuttingSavedGrid">
-          {matchingRecords.map((record) => {
+          {visibleRecords.map((record) => {
             const code =
               record.notes.match(/Codice articolo:\s*(.+)/i)?.[1] ||
               "Manuale";
@@ -822,6 +855,16 @@ function SavedCalculations({
           Nessun calcolo salvato per {operationLabels[operation].toLowerCase()}.
           Il prossimo comparirà qui automaticamente.
         </p>
+      )}
+
+      {filteredRecords.length > visibleLimit && (
+        <button
+          type="button"
+          className="cuttingHistoryMore"
+          onClick={() => setVisibleLimit((current) => current + 24)}
+        >
+          Mostra altri parametri
+        </button>
       )}
     </section>
   );

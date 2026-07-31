@@ -82,11 +82,16 @@ export async function analyzeCatalogFile(
 
 export function validateCatalogCandidates(
   candidates: CatalogCandidate[],
-  existingTools: RecordItem[]
+  existingCalculations: RecordItem[]
 ) {
   const existingCodes = new Set(
-    existingTools
-      .map((record) => record.tool?.code || "")
+    existingCalculations
+      .map(
+        (record) =>
+          record.tool?.code ||
+          record.notes.match(/Codice articolo:\s*(.+)/i)?.[1] ||
+          ""
+      )
       .filter(Boolean)
       .map(normalizeCode)
   );
@@ -124,32 +129,74 @@ export function validateCatalogCandidates(
   });
 }
 
-export function candidateToRecord(
+export function candidateToCalculationRecord(
   candidate: CatalogCandidate,
   catalogName: string,
   catalogId: string
 ): RecordItem {
   const now = new Date().toISOString();
-  const feedLabel = candidate.feedKind === "fz" ? "fz" : "f";
+  const operation = operationFromCategory(candidate.category);
+  const operationLabel =
+    operation === "milling"
+      ? "Fresatura"
+      : operation === "drilling"
+        ? "Foratura"
+        : "Tornitura";
+  const feedLabel = operation === "milling" ? "fz" : "f";
+  const feedUnit = operation === "milling" ? "mm/dente" : "mm/giro";
+  const rpm =
+    candidate.diameter > 0 && candidate.cuttingSpeed > 0
+      ? Math.round(
+          (candidate.cuttingSpeed * 1000) /
+            (Math.PI * candidate.diameter)
+        )
+      : 0;
+  const feedRate =
+    rpm > 0 && candidate.feed > 0
+      ? Math.round(
+          rpm *
+            candidate.feed *
+            (operation === "milling"
+              ? Math.max(candidate.teeth, 1)
+              : 1)
+        )
+      : 0;
   const notes = [
+    "[CALCOLO_PARAMETRI_V5]",
     "[IMPORT_CATALOGO]",
+    `Tipo calcolo: ${operation}`,
+    `Operazione: ${operationLabel}`,
+    `Codice articolo: ${candidate.code}`,
     `Catalogo: ${catalogName}`,
     `Catalogo ID: ${catalogId}`,
     candidate.sourcePage ? `Pagina catalogo: ${candidate.sourcePage}` : "",
+    `Utensile: ${candidate.name}`,
+    candidate.diameter > 0
+      ? `Diametro: ${decimalText(candidate.diameter)} mm`
+      : "Diametro: 0 mm",
+    operation === "milling" && candidate.teeth > 0
+      ? `Taglienti: ${candidate.teeth}`
+      : "",
     candidate.cuttingSpeed > 0
       ? `Vc: ${decimalText(candidate.cuttingSpeed)} m/min`
-      : "Vc: da verificare",
+      : "Vc: 0 m/min (da verificare)",
     candidate.feed > 0
-      ? `${feedLabel}: ${decimalText(candidate.feed)} ${
-          feedLabel === "fz" ? "mm/dente" : "mm/giro"
-        }`
-      : `${feedLabel}: da verificare`,
+      ? `${feedLabel}: ${decimalText(candidate.feed)} ${feedUnit}`
+      : `${feedLabel}: 0 ${feedUnit} (da verificare)`,
+    `Numero di giri: ${rpm} giri/min`,
+    `Velocità di avanzamento: ${feedRate} mm/min`,
     candidate.axialDepth > 0
       ? `ap: ${decimalText(candidate.axialDepth)} mm`
-      : "",
-    candidate.radialWidth > 0
+      : "ap: 0 mm",
+    operation === "milling" && candidate.radialWidth > 0
       ? `ae: ${decimalText(candidate.radialWidth)} mm`
-      : "",
+      : operation === "milling"
+        ? "ae: 0 mm"
+        : "",
+    "Lunghezza lavorata: 0 mm",
+    "Numero passate: 0",
+    "Angolo di attacco: 0°",
+    "hmax desiderato: 0 mm",
     candidate.warnings.length
       ? `Controlli richiesti: ${candidate.warnings.join(", ")}`
       : "Parametri riconosciuti automaticamente: verificare sempre con il catalogo.",
@@ -158,48 +205,37 @@ export function candidateToRecord(
     .join("\n");
 
   return {
-    id: createId("catalog-tool"),
-    module: "tools",
+    id: createId("catalog-parameter"),
+    module: "cutting",
     title: candidate.name,
-    subtitle: [
-      candidate.code,
-      candidate.diameter > 0
-        ? `Ø ${decimalText(candidate.diameter)} mm`
-        : "",
-    ]
-      .filter(Boolean)
-      .join(" · "),
-    status: "Disponibile",
+    subtitle: `${operationLabel} · ${candidate.code} · Vc ${
+      candidate.cuttingSpeed > 0
+        ? decimalText(candidate.cuttingSpeed)
+        : "—"
+    } m/min · ${feedLabel} ${
+      candidate.feed > 0 ? decimalText(candidate.feed) : "—"
+    } ${feedUnit}`,
+    status: "Catalogo",
     machineId: "",
     machine: "",
     notes,
     createdAt: now,
     updatedAt: now,
-    tool: {
-      code: candidate.code,
-      category: candidate.category,
-      manufacturer: manufacturerFromCatalog(catalogName),
-      material: candidate.toolMaterial,
-      coating: candidate.coating,
-      diameter:
-        candidate.diameter > 0 ? decimalText(candidate.diameter) : "",
-      cuttingLength:
-        candidate.cuttingLength > 0
-          ? decimalText(candidate.cuttingLength)
-          : "",
-      totalLength: "",
-      fluteCount: candidate.teeth > 0 ? String(candidate.teeth) : "",
-      holder: "",
-      location: "",
-      supplier: "",
-      unitCost: "",
-      quantity: "0",
-      minStock: "0",
-      lifeHours: "",
-      usedHours: "0",
-      lastUsedAt: "",
-    },
   };
+}
+
+function operationFromCategory(
+  category: ToolCategory
+): "milling" | "drilling" | "turning" {
+  if (category === "Punta" || category === "Maschio" || category === "Bareno") {
+    return "drilling";
+  }
+
+  if (category === "Tornitura" || category === "Inserto") {
+    return "turning";
+  }
+
+  return "milling";
 }
 
 async function parseExcel(file: File) {
@@ -749,14 +785,6 @@ function decimalText(value: number) {
 
 function unique<T>(values: T[]) {
   return Array.from(new Set(values));
-}
-
-function manufacturerFromCatalog(catalogName: string) {
-  if (/hoffmann|garant|holex|9002500/i.test(catalogName)) {
-    return "Hoffmann Group";
-  }
-
-  return "";
 }
 
 function createId(prefix: string) {

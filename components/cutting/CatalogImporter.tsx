@@ -12,7 +12,7 @@ import {
 
 import {
   analyzeCatalogFile,
-  candidateToRecord,
+  candidateToCalculationRecord,
   CatalogCandidate,
   CatalogProgress,
   validateCatalogCandidates,
@@ -20,7 +20,7 @@ import {
 import { RecordItem } from "@/types";
 
 type Props = {
-  existingTools: RecordItem[];
+  existingCalculations: RecordItem[];
   catalogs: RecordItem[];
   busy: boolean;
   saveCatalog: (
@@ -28,7 +28,7 @@ type Props = {
     file: File,
     onUploadProgress: (percent: number) => void
   ) => Promise<void>;
-  saveImportedTools: (
+  saveImportedParameters: (
     records: RecordItem[],
     onProgress?: (percent: number) => void
   ) => Promise<void>;
@@ -39,11 +39,11 @@ type Props = {
 const maximumUploadSize = 500 * 1024 * 1024;
 
 export default function CatalogImporter({
-  existingTools,
+  existingCalculations,
   catalogs,
   busy,
   saveCatalog,
-  saveImportedTools,
+  saveImportedParameters,
   notifySuccess,
   selectCatalog,
 }: Props) {
@@ -103,13 +103,13 @@ export default function CatalogImporter({
       );
       const validated = validateCatalogCandidates(
         candidates,
-        existingTools
+        existingCalculations
       );
       setRows(validated);
 
       if (!validated.length) {
         setError(
-          "Il catalogo è leggibile, ma non sono state riconosciute righe utensile. Puoi archiviarlo oppure convertirlo in CSV/XLSX."
+          "Il catalogo è leggibile, ma non sono stati riconosciuti parametri di taglio. Puoi archiviarlo oppure convertirlo in CSV/XLSX."
         );
       }
     } catch (cause) {
@@ -155,14 +155,14 @@ export default function CatalogImporter({
         id: catalogId,
         module: "manuals",
         title: file.name.replace(/\.[^.]+$/, ""),
-        subtitle: `Catalogo parametri · ${rows.length} utensili riconosciuti`,
+        subtitle: `Catalogo parametri · ${rows.length} righe riconosciute`,
         status: "Disponibile",
         machineId: "",
         machine: "",
         notes: [
           "[CATALOGO_PARAMETRI]",
           `File originale: ${file.name}`,
-          `Utensili riconosciuti: ${rows.length}`,
+          `Parametri riconosciuti: ${rows.length}`,
           `Duplicati rilevati: ${duplicateCount}`,
           `Valori da verificare: ${warningCount}`,
         ].join("\n"),
@@ -189,14 +189,16 @@ export default function CatalogImporter({
       const catalogId = createId("catalog");
       const records = rows
         .filter((row) => row.selected && row.valid && !row.duplicate)
-        .map((row) => candidateToRecord(row, file.name, catalogId));
+        .map((row) =>
+          candidateToCalculationRecord(row, file.name, catalogId)
+        );
 
-      await saveImportedTools(records, setImportPercent);
+      await saveImportedParameters(records, setImportPercent);
       importedCount = records.length;
       setImportPhase("catalog");
       await archiveCatalog(catalogId);
       notifySuccess(
-        `Catalogo archiviato e ${records.length} utensili importati correttamente.`
+        `Catalogo archiviato e ${records.length} parametri aggiunti allo storico.`
       );
       clearPreview();
     } catch (cause) {
@@ -206,7 +208,7 @@ export default function CatalogImporter({
           : "Si è verificato un errore durante l'importazione.";
       setError(
         importedCount
-          ? `${importedCount} utensili sono stati importati. Il file del catalogo non è stato archiviato: ${message}`
+          ? `${importedCount} parametri sono stati aggiunti allo storico. Il file del catalogo non è stato archiviato: ${message}`
           : `Importazione non riuscita: ${message}`
       );
     } finally {
@@ -305,9 +307,9 @@ export default function CatalogImporter({
             )}
             <span>
               {importPhase === "tools"
-                ? `Salvataggio di ${selectedCount} utensili…`
+                ? `Salvataggio di ${selectedCount} parametri nello storico…`
                 : uploadPercent < 100
-                  ? "Utensili salvati. Caricamento catalogo su Firebase…"
+                  ? "Parametri salvati. Caricamento catalogo su Firebase…"
                   : "Catalogo caricato. Finalizzazione…"}
             </span>
             <b>
@@ -436,7 +438,7 @@ export default function CatalogImporter({
             <CheckCircle2 size={17} />
             {importing
               ? "Importazione…"
-              : `Importa ${selectedCount} utensili`}
+              : `Importa ${selectedCount} parametri`}
           </button>
         </div>
       )}
