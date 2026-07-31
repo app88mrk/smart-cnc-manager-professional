@@ -121,6 +121,7 @@ export default function AppShell() {
     saveRecord,
     saveRecords,
     deleteRecord,
+    deleteRecords,
   } = useRecords({
     uid,
     enabled: dataEnabled,
@@ -402,6 +403,7 @@ export default function AppShell() {
             deleteCalculation={async (record) => {
               await deleteRecord(record);
             }}
+            deleteCalculations={deleteRecords}
             saveCatalog={async (record, file, onUploadProgress) => {
               await saveRecord({
                 record,

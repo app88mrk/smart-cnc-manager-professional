@@ -7,6 +7,7 @@ import {
   Database,
   Pencil,
   Save,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -51,6 +52,7 @@ type Props = {
   busy: boolean;
   saveCalculation: (record: RecordItem) => Promise<void>;
   deleteCalculation: (record: RecordItem) => Promise<void>;
+  deleteCalculations: (records: RecordItem[]) => Promise<void>;
   saveCatalog: (
     record: RecordItem,
     file: File,
@@ -93,6 +95,7 @@ export default function CuttingParametersPage({
   busy,
   saveCalculation,
   deleteCalculation,
+  deleteCalculations,
   saveCatalog,
   saveImportedParameters,
   notifySuccess,
@@ -342,6 +345,35 @@ export default function CuttingParametersPage({
       }
 
       notifySuccess(`Calcolo “${record.title}” eliminato dallo storico.`);
+    } catch {
+      // L'errore viene già mostrato da useRecords.
+    }
+  }
+
+  async function clearSavedHistory(recordsToDelete: RecordItem[]) {
+    if (!recordsToDelete.length) return;
+
+    const label = operationLabels[operation].toLowerCase();
+    const confirmed = window.confirm(
+      `Eliminare definitivamente tutto lo storico di ${label} (${recordsToDelete.length} elementi)? Cataloghi, manuali e utensili non verranno eliminati.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteCalculations(recordsToDelete);
+
+      if (
+        recordsToDelete.some(
+          (record) => record.id === editingCalculationId
+        )
+      ) {
+        resetCalculationForm();
+      }
+
+      notifySuccess(
+        `Storico di ${label} eliminato correttamente.`
+      );
     } catch {
       // L'errore viene già mostrato da useRecords.
     }
@@ -707,6 +739,7 @@ export default function CuttingParametersPage({
           busy={busy}
           onEdit={editSavedCalculation}
           onDelete={removeSavedCalculation}
+          onClear={clearSavedHistory}
         />
 
         <div className="cuttingActions">
@@ -759,12 +792,14 @@ function SavedCalculations({
   busy,
   onEdit,
   onDelete,
+  onClear,
 }: {
   records: RecordItem[];
   operation: CuttingOperation;
   busy: boolean;
   onEdit: (record: RecordItem) => void;
   onDelete: (record: RecordItem) => void | Promise<void>;
+  onClear: (records: RecordItem[]) => void | Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [visibleLimit, setVisibleLimit] = useState(24);
@@ -787,7 +822,19 @@ function SavedCalculations({
           <span>STORICO DEL CALCOLO</span>
           <h3>Calcoli {operationLabels[operation].toLowerCase()} salvati</h3>
         </div>
-        <b>{matchingRecords.length}</b>
+        <div className="cuttingSavedHeadActions">
+          <b>{matchingRecords.length}</b>
+          {matchingRecords.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onClear(matchingRecords)}
+              disabled={busy}
+            >
+              <Trash2 size={14} />
+              Elimina storico
+            </button>
+          )}
+        </div>
       </div>
 
       {matchingRecords.length > 12 && (

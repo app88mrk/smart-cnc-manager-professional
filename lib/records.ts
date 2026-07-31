@@ -221,6 +221,44 @@ export async function removeRecord(
   }
 }
 
+export async function removeRecords(
+  uid: string,
+  records: RecordItem[]
+): Promise<void> {
+  if (!records.length) return;
+
+  if (storage) {
+    await Promise.all(
+      records
+        .filter((record) => record.filePath)
+        .map(async (record) => {
+          try {
+            await deleteObject(ref(storage!, record.filePath!));
+          } catch {
+            // Il file potrebbe essere già stato rimosso.
+          }
+        })
+    );
+  }
+
+  if (!db) {
+    const ids = new Set(records.map((record) => record.id));
+    writeLocal(
+      uid,
+      readLocal(uid).filter((record) => !ids.has(record.id))
+    );
+    return;
+  }
+
+  for (const chunk of chunkRecords(records, 400)) {
+    const batch = writeBatch(db);
+    chunk.forEach((record) => {
+      batch.delete(doc(db!, "users", uid, "records", record.id));
+    });
+    await batch.commit();
+  }
+}
+
 export async function replaceRecords(
   uid: string,
   records: RecordItem[]

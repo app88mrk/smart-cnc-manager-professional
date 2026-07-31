@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   listRecords,
   removeRecord,
+  removeRecords as persistRemovedRecords,
   replaceRecords as persistRecords,
   saveRecord as persistRecord,
   saveRecords as persistNewRecords,
@@ -102,6 +103,23 @@ export default function useRecords({
     [onError, uid]
   );
 
+  const deleteRecords = useCallback(
+    async (recordsToDelete: RecordItem[]) => {
+      setRecordsLoading(true);
+
+      try {
+        await persistRemovedRecords(uid, recordsToDelete);
+        setRecords(await listRecords(uid));
+      } catch (error) {
+        onError(errorMessage(error));
+        throw error;
+      } finally {
+        setRecordsLoading(false);
+      }
+    },
+    [onError, uid]
+  );
+
   const saveRecords = useCallback(
     async (
       nextRecords: RecordItem[],
@@ -153,6 +171,7 @@ export default function useRecords({
     saveRecord,
     saveRecords,
     deleteRecord,
+    deleteRecords,
     replaceRecords,
   };
 }
