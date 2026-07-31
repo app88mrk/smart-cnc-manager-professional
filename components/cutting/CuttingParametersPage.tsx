@@ -1,18 +1,16 @@
 "use client";
 
-import { ChangeEvent, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
-  BookOpen,
   Calculator,
   Database,
-  Download,
-  FileUp,
   Pencil,
   Save,
   X,
 } from "lucide-react";
 
+import CatalogImporter from "@/components/cutting/CatalogImporter";
 import {
   calculateFeed,
   calculateFeedForTargetChipThickness,
@@ -54,12 +52,12 @@ type Props = {
   saveCalculation: (record: RecordItem) => Promise<void>;
   deleteCalculation: (record: RecordItem) => Promise<void>;
   saveCatalog: (record: RecordItem, file: File) => Promise<void>;
+  saveImportedTools: (records: RecordItem[]) => Promise<void>;
   notifySuccess: (message: string) => void;
 };
 
 const catalogMarker = "[CATALOGO_PARAMETRI]";
 const calculationMarker = "[CALCOLO_PARAMETRI_V5]";
-const maximumUploadSize = 500 * 1024 * 1024;
 
 const operationLabels: Record<CuttingOperation, string> = {
   milling: "Fresatura",
@@ -89,6 +87,7 @@ export default function CuttingParametersPage({
   saveCalculation,
   deleteCalculation,
   saveCatalog,
+  saveImportedTools,
   notifySuccess,
 }: Props) {
   const tools = useMemo(
@@ -135,7 +134,6 @@ export default function CuttingParametersPage({
   const [editingCalculationId, setEditingCalculationId] =
     useState("");
   const [localError, setLocalError] = useState("");
-  const [catalogError, setCatalogError] = useState("");
 
   const numeric = useMemo(
     () => ({
@@ -431,54 +429,6 @@ export default function CuttingParametersPage({
     }
   }
 
-  async function handleCatalogUpload(
-    event: ChangeEvent<HTMLInputElement>
-  ) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
-    setCatalogError("");
-
-    if (!file.size) {
-      setCatalogError("Il catalogo selezionato è vuoto.");
-      return;
-    }
-
-    if (file.size > maximumUploadSize) {
-      setCatalogError("Il catalogo non può superare 500 MB.");
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const id = createId("catalog");
-
-    try {
-      await saveCatalog(
-        {
-          id,
-          module: "manuals",
-          title: file.name.replace(/\.[^.]+$/, ""),
-          subtitle: "Catalogo parametri di taglio",
-          status: "Disponibile",
-          machineId: "",
-          machine: "",
-          notes: `${catalogMarker}\nCatalogo caricato dalla sezione Parametri di taglio.`,
-          createdAt: now,
-          updatedAt: now,
-        },
-        file
-      );
-      setSelectedCatalogId(id);
-      notifySuccess(`Catalogo “${file.name}” caricato correttamente.`);
-    } catch {
-      // L'errore viene già mostrato da useRecords.
-    }
-  }
-
   return (
     <section className="cuttingCalculator">
       <div className="pageHead cuttingPageHead">
@@ -605,67 +555,15 @@ export default function CuttingParametersPage({
         </label>
       </div>
 
-      <section className="cuttingCatalogPanel">
-        <div className="cuttingCatalogHead">
-          <div>
-            <BookOpen size={19} />
-            <div>
-              <b>Archivio cataloghi</b>
-              <small>PDF, CSV, Excel, JSON, TSV e file di testo fino a 500 MB</small>
-            </div>
-          </div>
-
-          <label className={`cuttingCatalogUpload ${busy ? "disabled" : ""}`}>
-            <FileUp size={17} />
-            {busy ? "Caricamento…" : "Carica catalogo"}
-            <input
-              type="file"
-              accept=".pdf,.csv,.xlsx,.xls,.json,.tsv,.txt"
-              disabled={busy}
-              onChange={handleCatalogUpload}
-            />
-          </label>
-        </div>
-
-        {catalogError && (
-          <div className="cuttingWarning error">
-            <AlertTriangle size={18} />
-            {catalogError}
-          </div>
-        )}
-
-        {catalogs.length ? (
-          <div className="cuttingCatalogList">
-            {catalogs.map((catalog) => (
-              <article key={catalog.id}>
-                <div>
-                  <b>{catalog.title}</b>
-                  <small>
-                    {catalog.fileName || "Catalogo"}
-                    {catalog.fileSize
-                      ? ` · ${formatBytes(catalog.fileSize)}`
-                      : ""}
-                  </small>
-                </div>
-                {catalog.fileUrl && (
-                  <a
-                    href={catalog.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    title="Apri catalogo"
-                  >
-                    <Download size={16} />
-                  </a>
-                )}
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className="cuttingCatalogEmpty">
-            Nessun catalogo caricato. Puoi comunque usare il calcolo manuale.
-          </p>
-        )}
-      </section>
+      <CatalogImporter
+        existingTools={tools}
+        catalogs={catalogs}
+        busy={busy}
+        saveCatalog={saveCatalog}
+        saveImportedTools={saveImportedTools}
+        notifySuccess={notifySuccess}
+        selectCatalog={setSelectedCatalogId}
+      />
 
       <div className="cuttingTabs" role="tablist" aria-label="Calcoli disponibili">
         {([
@@ -1152,12 +1050,4 @@ function formatDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
-}
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

@@ -7,6 +7,7 @@ import {
   removeRecord,
   replaceRecords as persistRecords,
   saveRecord as persistRecord,
+  saveRecords as persistNewRecords,
 } from "@/lib/records";
 import { RecordItem } from "@/types";
 
@@ -93,6 +94,29 @@ export default function useRecords({
     [onError, uid]
   );
 
+  const saveRecords = useCallback(
+    async (nextRecords: RecordItem[]) => {
+      setRecordsLoading(true);
+
+      try {
+        await persistNewRecords(
+          uid,
+          nextRecords.map((record) => ({
+            ...record,
+            updatedAt: new Date().toISOString(),
+          }))
+        );
+        setRecords(await listRecords(uid));
+      } catch (error) {
+        onError(errorMessage(error));
+        throw error;
+      } finally {
+        setRecordsLoading(false);
+      }
+    },
+    [onError, uid]
+  );
+
   const replaceRecords = useCallback(
     async (nextRecords: RecordItem[]) => {
       setRecordsLoading(true);
@@ -115,6 +139,7 @@ export default function useRecords({
     recordsLoading,
     refreshRecords,
     saveRecord,
+    saveRecords,
     deleteRecord,
     replaceRecords,
   };

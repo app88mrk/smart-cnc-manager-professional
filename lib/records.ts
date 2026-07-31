@@ -6,6 +6,7 @@ import {
   orderBy,
   query,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
 import {
   deleteObject,
@@ -133,6 +134,41 @@ export async function saveRecord(
   return saved;
 }
 
+export async function saveRecords(
+  uid: string,
+  incomingRecords: RecordItem[]
+): Promise<void> {
+  if (!incomingRecords.length) {
+    return;
+  }
+
+  if (!db) {
+    const byId = new Map(
+      readLocal(uid).map((record) => [record.id, record])
+    );
+
+    incomingRecords.forEach((record) => {
+      byId.set(record.id, record);
+    });
+    writeLocal(uid, Array.from(byId.values()));
+    return;
+  }
+
+  const chunks = chunkRecords(incomingRecords, 400);
+
+  for (const chunk of chunks) {
+    const batch = writeBatch(db);
+
+    chunk.forEach((record) => {
+      batch.set(
+        doc(db!, "users", uid, "records", record.id),
+        record
+      );
+    });
+    await batch.commit();
+  }
+}
+
 export async function removeRecord(
   uid: string,
   record: RecordItem
@@ -183,4 +219,14 @@ export async function replaceRecords(
       )
     ),
   ]);
+}
+
+function chunkRecords(records: RecordItem[], size: number) {
+  const chunks: RecordItem[][] = [];
+
+  for (let index = 0; index < records.length; index += size) {
+    chunks.push(records.slice(index, index + size));
+  }
+
+  return chunks;
 }

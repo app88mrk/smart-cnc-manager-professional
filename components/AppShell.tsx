@@ -119,6 +119,7 @@ export default function AppShell() {
     recordsLoading,
     refreshRecords,
     saveRecord,
+    saveRecords,
     deleteRecord,
   } = useRecords({
     uid,
@@ -403,6 +404,7 @@ export default function AppShell() {
                 attachment: file,
               });
             }}
+            saveImportedTools={saveRecords}
           />
         ) : isRecordModuleId(active) ? (
           <RecordsPage
