@@ -28,7 +28,10 @@ type Props = {
     file: File,
     onUploadProgress: (percent: number) => void
   ) => Promise<void>;
-  saveImportedTools: (records: RecordItem[]) => Promise<void>;
+  saveImportedTools: (
+    records: RecordItem[],
+    onProgress?: (percent: number) => void
+  ) => Promise<void>;
   notifySuccess: (message: string) => void;
   selectCatalog: (catalogId: string) => void;
 };
@@ -50,6 +53,10 @@ export default function CatalogImporter({
   const [analyzing, setAnalyzing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [uploadPercent, setUploadPercent] = useState(0);
+  const [importPercent, setImportPercent] = useState(0);
+  const [importPhase, setImportPhase] = useState<
+    "idle" | "tools" | "catalog"
+  >("idle");
   const [error, setError] = useState("");
 
   const selectedCount = useMemo(
@@ -135,11 +142,12 @@ export default function CatalogImporter({
     );
   }
 
-  async function archiveCatalog() {
+  async function archiveCatalog(
+    catalogId = createId("catalog")
+  ) {
     if (!file) return null;
 
     const now = new Date().toISOString();
-    const catalogId = createId("catalog");
 
     setUploadPercent(0);
     await saveCatalog(
@@ -172,26 +180,38 @@ export default function CatalogImporter({
     if (!file || !selectedCount) return;
 
     setImporting(true);
+    setImportPhase("tools");
+    setImportPercent(0);
     setError("");
+    let importedCount = 0;
 
     try {
-      const catalogId = await archiveCatalog();
-
-      if (!catalogId) return;
-
+      const catalogId = createId("catalog");
       const records = rows
         .filter((row) => row.selected && row.valid && !row.duplicate)
         .map((row) => candidateToRecord(row, file.name, catalogId));
 
-      await saveImportedTools(records);
+      await saveImportedTools(records, setImportPercent);
+      importedCount = records.length;
+      setImportPhase("catalog");
+      await archiveCatalog(catalogId);
       notifySuccess(
         `Catalogo archiviato e ${records.length} utensili importati correttamente.`
       );
       clearPreview();
-    } catch {
-      // L'errore viene già mostrato da useRecords.
+    } catch (cause) {
+      const message =
+        cause instanceof Error
+          ? cause.message
+          : "Si è verificato un errore durante l'importazione.";
+      setError(
+        importedCount
+          ? `${importedCount} utensili sono stati importati. Il file del catalogo non è stato archiviato: ${message}`
+          : `Importazione non riuscita: ${message}`
+      );
     } finally {
       setImporting(false);
+      setImportPhase("idle");
     }
   }
 
@@ -199,16 +219,22 @@ export default function CatalogImporter({
     if (!file) return;
 
     setImporting(true);
+    setImportPhase("catalog");
     setError("");
 
     try {
       await archiveCatalog();
       notifySuccess(`Catalogo “${file.name}” archiviato correttamente.`);
       clearPreview();
-    } catch {
-      // L'errore viene già mostrato da useRecords.
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Impossibile archiviare il catalogo."
+      );
     } finally {
       setImporting(false);
+      setImportPhase("idle");
     }
   }
 
@@ -217,6 +243,8 @@ export default function CatalogImporter({
     setRows([]);
     setProgress(null);
     setUploadPercent(0);
+    setImportPercent(0);
+    setImportPhase("idle");
     setError("");
   }
 
@@ -270,15 +298,26 @@ export default function CatalogImporter({
       {importing && file && (
         <div className="catalogProgress catalogUploadProgress" role="status">
           <div>
-            <FileUp size={17} />
+            {importPhase === "tools" ? (
+              <CheckCircle2 size={17} />
+            ) : (
+              <FileUp size={17} />
+            )}
             <span>
-              {uploadPercent < 100
-                ? "Caricamento catalogo su Firebase…"
-                : "Catalogo caricato. Salvataggio utensili…"}
+              {importPhase === "tools"
+                ? `Salvataggio di ${selectedCount} utensili…`
+                : uploadPercent < 100
+                  ? "Utensili salvati. Caricamento catalogo su Firebase…"
+                  : "Catalogo caricato. Finalizzazione…"}
             </span>
-            <b>{uploadPercent}%</b>
+            <b>
+              {importPhase === "tools" ? importPercent : uploadPercent}%
+            </b>
           </div>
-          <progress value={uploadPercent} max={100} />
+          <progress
+            value={importPhase === "tools" ? importPercent : uploadPercent}
+            max={100}
+          />
           <small>
             Per i cataloghi molto grandi possono servire alcuni minuti. Non
             chiudere questa pagina.

@@ -154,11 +154,15 @@ export async function saveRecord(
 
 export async function saveRecords(
   uid: string,
-  incomingRecords: RecordItem[]
+  incomingRecords: RecordItem[],
+  onProgress?: (percent: number) => void
 ): Promise<void> {
   if (!incomingRecords.length) {
+    onProgress?.(100);
     return;
   }
+
+  onProgress?.(0);
 
   if (!db) {
     const byId = new Map(
@@ -169,10 +173,12 @@ export async function saveRecords(
       byId.set(record.id, record);
     });
     writeLocal(uid, Array.from(byId.values()));
+    onProgress?.(100);
     return;
   }
 
   const chunks = chunkRecords(incomingRecords, 400);
+  let completed = 0;
 
   for (const chunk of chunks) {
     const batch = writeBatch(db);
@@ -184,6 +190,10 @@ export async function saveRecords(
       );
     });
     await batch.commit();
+    completed += chunk.length;
+    onProgress?.(
+      Math.round((completed / incomingRecords.length) * 100)
+    );
   }
 }
 

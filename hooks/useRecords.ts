@@ -103,7 +103,10 @@ export default function useRecords({
   );
 
   const saveRecords = useCallback(
-    async (nextRecords: RecordItem[]) => {
+    async (
+      nextRecords: RecordItem[],
+      onProgress?: (percent: number) => void
+    ) => {
       setRecordsLoading(true);
 
       try {
@@ -112,7 +115,8 @@ export default function useRecords({
           nextRecords.map((record) => ({
             ...record,
             updatedAt: new Date().toISOString(),
-          }))
+          })),
+          onProgress
         );
         setRecords(await listRecords(uid));
       } catch (error) {

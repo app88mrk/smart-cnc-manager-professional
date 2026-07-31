@@ -56,7 +56,10 @@ type Props = {
     file: File,
     onUploadProgress: (percent: number) => void
   ) => Promise<void>;
-  saveImportedTools: (records: RecordItem[]) => Promise<void>;
+  saveImportedTools: (
+    records: RecordItem[],
+    onProgress?: (percent: number) => void
+  ) => Promise<void>;
   notifySuccess: (message: string) => void;
 };
 
