@@ -51,7 +51,11 @@ type Props = {
   busy: boolean;
   saveCalculation: (record: RecordItem) => Promise<void>;
   deleteCalculation: (record: RecordItem) => Promise<void>;
-  saveCatalog: (record: RecordItem, file: File) => Promise<void>;
+  saveCatalog: (
+    record: RecordItem,
+    file: File,
+    onUploadProgress: (percent: number) => void
+  ) => Promise<void>;
   saveImportedTools: (records: RecordItem[]) => Promise<void>;
   notifySuccess: (message: string) => void;
 };

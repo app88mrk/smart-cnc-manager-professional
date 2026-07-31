@@ -20,6 +20,8 @@ type UseRecordsOptions = {
 type SaveRecordInput = {
   record: RecordItem;
   attachment: File | null;
+  background?: boolean;
+  onUploadProgress?: (percent: number) => void;
 };
 
 export default function useRecords({
@@ -54,8 +56,13 @@ export default function useRecords({
   }, [refreshRecords]);
 
   const saveRecord = useCallback(
-    async ({ record, attachment }: SaveRecordInput) => {
-      setRecordsLoading(true);
+    async ({
+      record,
+      attachment,
+      background = false,
+      onUploadProgress,
+    }: SaveRecordInput) => {
+      if (!background) setRecordsLoading(true);
 
       try {
         await persistRecord(
@@ -64,14 +71,15 @@ export default function useRecords({
             ...record,
             updatedAt: new Date().toISOString(),
           },
-          attachment
+          attachment,
+          onUploadProgress
         );
         setRecords(await listRecords(uid));
       } catch (error) {
         onError(errorMessage(error));
         throw error;
       } finally {
-        setRecordsLoading(false);
+        if (!background) setRecordsLoading(false);
       }
     },
     [onError, uid]

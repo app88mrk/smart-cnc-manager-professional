@@ -398,10 +398,12 @@ export default function AppShell() {
             deleteCalculation={async (record) => {
               await deleteRecord(record);
             }}
-            saveCatalog={async (record, file) => {
+            saveCatalog={async (record, file, onUploadProgress) => {
               await saveRecord({
                 record,
                 attachment: file,
+                background: true,
+                onUploadProgress,
               });
             }}
             saveImportedTools={saveRecords}

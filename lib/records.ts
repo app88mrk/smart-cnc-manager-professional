@@ -12,7 +12,7 @@ import {
   deleteObject,
   getDownloadURL,
   ref,
-  uploadBytes,
+  uploadBytesResumable,
 } from "firebase/storage";
 
 import { db, storage } from "@/lib/firebase";
@@ -59,7 +59,8 @@ export async function listRecords(uid: string): Promise<RecordItem[]> {
 export async function saveRecord(
   uid: string,
   record: RecordItem,
-  attachment?: File | null
+  attachment?: File | null,
+  onUploadProgress?: (percent: number) => void
 ): Promise<RecordItem> {
   let saved = { ...record };
 
@@ -95,10 +96,27 @@ export async function saveRecord(
       `${Date.now()}-${safeName}`;
     const fileReference = ref(storage, filePath);
 
-    await uploadBytes(fileReference, attachment, {
+    const uploadTask = uploadBytesResumable(fileReference, attachment, {
       contentType:
         attachment.type || "application/octet-stream",
     });
+
+    await new Promise<void>((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const percent = snapshot.totalBytes
+            ? Math.round(
+                (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+              )
+            : 0;
+          onUploadProgress?.(percent);
+        },
+        reject,
+        resolve
+      );
+    });
+    onUploadProgress?.(100);
 
     saved = {
       ...saved,

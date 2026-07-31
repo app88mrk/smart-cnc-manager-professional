@@ -23,7 +23,11 @@ type Props = {
   existingTools: RecordItem[];
   catalogs: RecordItem[];
   busy: boolean;
-  saveCatalog: (record: RecordItem, file: File) => Promise<void>;
+  saveCatalog: (
+    record: RecordItem,
+    file: File,
+    onUploadProgress: (percent: number) => void
+  ) => Promise<void>;
   saveImportedTools: (records: RecordItem[]) => Promise<void>;
   notifySuccess: (message: string) => void;
   selectCatalog: (catalogId: string) => void;
@@ -45,6 +49,7 @@ export default function CatalogImporter({
   const [progress, setProgress] = useState<CatalogProgress | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [uploadPercent, setUploadPercent] = useState(0);
   const [error, setError] = useState("");
 
   const selectedCount = useMemo(
@@ -136,6 +141,7 @@ export default function CatalogImporter({
     const now = new Date().toISOString();
     const catalogId = createId("catalog");
 
+    setUploadPercent(0);
     await saveCatalog(
       {
         id: catalogId,
@@ -155,7 +161,8 @@ export default function CatalogImporter({
         createdAt: now,
         updatedAt: now,
       },
-      file
+      file,
+      setUploadPercent
     );
     selectCatalog(catalogId);
     return catalogId;
@@ -209,6 +216,7 @@ export default function CatalogImporter({
     setFile(null);
     setRows([]);
     setProgress(null);
+    setUploadPercent(0);
     setError("");
   }
 
@@ -256,6 +264,25 @@ export default function CatalogImporter({
             </b>
           </div>
           <progress value={progress.current} max={progress.total} />
+        </div>
+      )}
+
+      {importing && file && (
+        <div className="catalogProgress catalogUploadProgress" role="status">
+          <div>
+            <FileUp size={17} />
+            <span>
+              {uploadPercent < 100
+                ? "Caricamento catalogo su Firebase…"
+                : "Catalogo caricato. Salvataggio utensili…"}
+            </span>
+            <b>{uploadPercent}%</b>
+          </div>
+          <progress value={uploadPercent} max={100} />
+          <small>
+            Per i cataloghi molto grandi possono servire alcuni minuti. Non
+            chiudere questa pagina.
+          </small>
         </div>
       )}
 
