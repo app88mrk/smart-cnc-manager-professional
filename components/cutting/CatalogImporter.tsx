@@ -8,6 +8,7 @@ import {
   Download,
   FileSearch,
   FileUp,
+  Trash2,
 } from "lucide-react";
 
 import {
@@ -32,6 +33,7 @@ type Props = {
     records: RecordItem[],
     onProgress?: (percent: number) => void
   ) => Promise<void>;
+  deleteCatalog: (record: RecordItem) => Promise<void>;
   notifySuccess: (message: string) => void;
   selectCatalog: (catalogId: string) => void;
 };
@@ -44,6 +46,7 @@ export default function CatalogImporter({
   busy,
   saveCatalog,
   saveImportedParameters,
+  deleteCatalog,
   notifySuccess,
   selectCatalog,
 }: Props) {
@@ -57,6 +60,7 @@ export default function CatalogImporter({
   const [importPhase, setImportPhase] = useState<
     "idle" | "tools" | "catalog"
   >("idle");
+  const [deletingCatalogId, setDeletingCatalogId] = useState("");
   const [error, setError] = useState("");
 
   const selectedCount = useMemo(
@@ -248,6 +252,31 @@ export default function CatalogImporter({
     setImportPercent(0);
     setImportPhase("idle");
     setError("");
+  }
+
+  async function removeCatalog(catalog: RecordItem) {
+    const confirmed = window.confirm(
+      `Eliminare definitivamente il catalogo “${catalog.title}” e il relativo file? I parametri già presenti nello storico resteranno disponibili.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingCatalogId(catalog.id);
+    setError("");
+
+    try {
+      await deleteCatalog(catalog);
+      selectCatalog("");
+      notifySuccess(`Catalogo “${catalog.title}” eliminato correttamente.`);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Impossibile eliminare il catalogo."
+      );
+    } finally {
+      setDeletingCatalogId("");
+    }
   }
 
   return (
@@ -456,16 +485,27 @@ export default function CatalogImporter({
                     : ""}
                 </small>
               </div>
-              {catalog.fileUrl && (
-                <a
-                  href={catalog.fileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="Apri catalogo"
+              <div className="cuttingCatalogCardActions">
+                {catalog.fileUrl && (
+                  <a
+                    href={catalog.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Apri catalogo"
+                  >
+                    <Download size={16} />
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeCatalog(catalog)}
+                  disabled={working || deletingCatalogId === catalog.id}
+                  title="Elimina catalogo"
+                  aria-label={`Elimina ${catalog.title}`}
                 >
-                  <Download size={16} />
-                </a>
-              )}
+                  <Trash2 size={15} />
+                </button>
+              </div>
             </article>
           ))}
         </div>

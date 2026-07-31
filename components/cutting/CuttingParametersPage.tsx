@@ -62,6 +62,7 @@ type Props = {
     records: RecordItem[],
     onProgress?: (percent: number) => void
   ) => Promise<void>;
+  deleteCatalog: (record: RecordItem) => Promise<void>;
   notifySuccess: (message: string) => void;
 };
 
@@ -98,6 +99,7 @@ export default function CuttingParametersPage({
   deleteCalculations,
   saveCatalog,
   saveImportedParameters,
+  deleteCatalog,
   notifySuccess,
 }: Props) {
   const tools = useMemo(
@@ -605,6 +607,7 @@ export default function CuttingParametersPage({
         busy={busy}
         saveCatalog={saveCatalog}
         saveImportedParameters={saveImportedParameters}
+        deleteCatalog={deleteCatalog}
         notifySuccess={notifySuccess}
         selectCatalog={setSelectedCatalogId}
       />

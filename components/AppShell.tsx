@@ -404,6 +404,7 @@ export default function AppShell() {
               await deleteRecord(record);
             }}
             deleteCalculations={deleteRecords}
+            deleteCatalog={deleteRecord}
             saveCatalog={async (record, file, onUploadProgress) => {
               await saveRecord({
                 record,
