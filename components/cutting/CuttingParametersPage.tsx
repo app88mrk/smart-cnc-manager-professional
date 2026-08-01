@@ -6,13 +6,20 @@ import {
   Calculator,
   Database,
   Pencil,
+  Printer,
   Save,
+  Star,
   Trash2,
   X,
 } from "lucide-react";
 
 import CatalogImporter from "@/components/cutting/CatalogImporter";
 import CatalogParameterLibrary from "@/components/cutting/CatalogParameterLibrary";
+import ProfessionalCuttingPanel, {
+  CuttingOutcome,
+  CuttingStrategy,
+  MachineCheck,
+} from "@/components/cutting/ProfessionalCuttingPanel";
 import {
   calculateFeed,
   calculateFeedForTargetChipThickness,
@@ -31,6 +38,11 @@ import {
 import { Machine, RecordItem } from "@/types";
 
 type CalculatorTab = CuttingOperation | "chip" | "power";
+
+type CatalogBaseValues = {
+  cuttingSpeed: number;
+  feed: number;
+};
 
 type CalculatorValues = {
   articleCode: string;
@@ -117,6 +129,16 @@ export default function CuttingParametersPage({
     () => records.filter((record) => record.module === "materials"),
     [records]
   );
+  const jobs = useMemo(
+    () =>
+      records.filter(
+        (record) =>
+          record.module === "jobs" &&
+          !record.notes.includes(calculationMarker) &&
+          !/^(Fresatura|Foratura|Tornitura)\s*·/i.test(record.title)
+      ),
+    [records]
+  );
   const catalogs = useMemo(
     () =>
       records.filter(
@@ -162,6 +184,15 @@ export default function CuttingParametersPage({
     useState("");
   const [localError, setLocalError] = useState("");
   const [catalogManagerOpen, setCatalogManagerOpen] = useState(false);
+  const [strategy, setStrategy] =
+    useState<CuttingStrategy>("manual");
+  const [catalogBase, setCatalogBase] =
+    useState<CatalogBaseValues | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState("");
+  const [outcome, setOutcome] =
+    useState<CuttingOutcome>("Da testare");
+  const [favorite, setFavorite] = useState(false);
+  const [experienceNotes, setExperienceNotes] = useState("");
 
   const numeric = useMemo(
     () => ({
@@ -224,7 +255,77 @@ export default function CuttingParametersPage({
     (machine) => machine.id === selectedMachineId
   );
   const spindleLimit = parseSpindleLimit(selectedMachine?.spindle || "");
+  const machinePowerLimit = parseMachineNoteLimit(
+    selectedMachine?.notes || "",
+    /potenza(?:\s+massima)?[^\d]*(\d+(?:[.,]\d+)?)\s*k\s*w/i
+  );
+  const machineFeedLimit = parseMachineNoteLimit(
+    selectedMachine?.notes || "",
+    /avanzamento(?:\s+massimo)?[^\d]*(\d+(?:[.,]\d+)?)\s*mm\s*\/\s*min/i
+  );
+  const machineTorqueLimit = parseMachineNoteLimit(
+    selectedMachine?.notes || "",
+    /coppia(?:\s+massima)?[^\d]*(\d+(?:[.,]\d+)?)\s*n\s*m/i
+  );
+  const estimatedTorque = rpm > 0 ? (9550 * power) / rpm : 0;
   const exceedsSpindle = spindleLimit > 0 && rpm > spindleLimit;
+  const exceedsFeed = machineFeedLimit > 0 && feed > machineFeedLimit;
+  const exceedsPower = machinePowerLimit > 0 && power > machinePowerLimit;
+  const exceedsTorque =
+    machineTorqueLimit > 0 && estimatedTorque > machineTorqueLimit;
+  const machineChecks = useMemo<MachineCheck[]>(() => {
+    if (!selectedMachine) return [];
+    const checks: MachineCheck[] = [];
+
+    if (spindleLimit > 0) {
+      checks.push({
+        label: "Numero di giri",
+        value: `${formatNumber(rpm)} giri/min`,
+        limit: `${formatNumber(spindleLimit)} giri/min`,
+        exceeded: exceedsSpindle,
+      });
+    }
+    if (machineFeedLimit > 0) {
+      checks.push({
+        label: "Avanzamento",
+        value: `${formatNumber(feed)} mm/min`,
+        limit: `${formatNumber(machineFeedLimit)} mm/min`,
+        exceeded: exceedsFeed,
+      });
+    }
+    if (machinePowerLimit > 0) {
+      checks.push({
+        label: "Potenza stimata",
+        value: `${formatNumber(power, 2)} kW`,
+        limit: `${formatNumber(machinePowerLimit, 2)} kW`,
+        exceeded: exceedsPower,
+      });
+    }
+    if (machineTorqueLimit > 0) {
+      checks.push({
+        label: "Coppia stimata",
+        value: `${formatNumber(estimatedTorque, 1)} Nm`,
+        limit: `${formatNumber(machineTorqueLimit, 1)} Nm`,
+        exceeded: exceedsTorque,
+      });
+    }
+
+    return checks;
+  }, [
+    exceedsFeed,
+    exceedsPower,
+    exceedsSpindle,
+    exceedsTorque,
+    estimatedTorque,
+    feed,
+    machineFeedLimit,
+    machinePowerLimit,
+    machineTorqueLimit,
+    power,
+    rpm,
+    selectedMachine,
+    spindleLimit,
+  ]);
   const validCalculation =
     numeric.diameter > 0 &&
     numeric.cuttingSpeed > 0 &&
@@ -233,7 +334,62 @@ export default function CuttingParametersPage({
 
   function updateValue(key: keyof CalculatorValues, value: string) {
     setValues((current) => ({ ...current, [key]: value }));
+    if (
+      key === "cuttingSpeed" ||
+      key === "feedPerTooth" ||
+      key === "feedPerRev"
+    ) {
+      setStrategy("manual");
+    }
     setLocalError("");
+  }
+
+  function applyStrategy(nextStrategy: CuttingStrategy) {
+    setStrategy(nextStrategy);
+    if (nextStrategy === "manual" || !catalogBase) return;
+
+    const factor =
+      nextStrategy === "conservative"
+        ? 0.85
+        : nextStrategy === "productive"
+          ? 1.1
+          : 1;
+    setValues((current) => ({
+      ...current,
+      cuttingSpeed: decimalText(catalogBase.cuttingSpeed * factor),
+      ...(operation === "milling"
+        ? { feedPerTooth: decimalText(catalogBase.feed * factor) }
+        : { feedPerRev: decimalText(catalogBase.feed * factor) }),
+    }));
+  }
+
+  function applyMachineLimits() {
+    const speedFactor =
+      exceedsSpindle && rpm > 0 ? spindleLimit / rpm : 1;
+    const feedAfterSpeed = feed * speedFactor;
+    const powerAfterSpeed = power * speedFactor;
+    const feedFactor = Math.min(
+      1,
+      exceedsFeed && feedAfterSpeed > 0
+        ? machineFeedLimit / feedAfterSpeed
+        : 1,
+      exceedsPower && powerAfterSpeed > 0
+        ? machinePowerLimit / powerAfterSpeed
+        : 1,
+      exceedsTorque && estimatedTorque > 0
+        ? machineTorqueLimit / estimatedTorque
+        : 1
+    );
+
+    setValues((current) => ({
+      ...current,
+      cuttingSpeed: decimalText(numeric.cuttingSpeed * speedFactor),
+      ...(operation === "milling"
+        ? { feedPerTooth: decimalText(numeric.feedPerTooth * feedFactor) }
+        : { feedPerRev: decimalText(numeric.feedPerRev * feedFactor) }),
+    }));
+    setStrategy("manual");
+    notifySuccess("Parametri adeguati ai limiti macchina rilevati.");
   }
 
   function openTab(nextTab: CalculatorTab) {
@@ -250,6 +406,8 @@ export default function CuttingParametersPage({
 
   function selectTool(toolId: string) {
     setSelectedToolId(toolId);
+    setCatalogBase(null);
+    setStrategy("manual");
     setLocalError("");
 
     if (!toolId) {
@@ -308,6 +466,12 @@ export default function CuttingParametersPage({
     setSelectedMachineId("");
     setSelectedCatalogId("");
     setMaterialGroup("P");
+    setStrategy("manual");
+    setCatalogBase(null);
+    setSelectedJobId("");
+    setOutcome("Da testare");
+    setFavorite(false);
+    setExperienceNotes("");
     setLocalError("");
   }
 
@@ -326,7 +490,13 @@ export default function CuttingParametersPage({
     setSelectedToolId(savedText(record.notes, "Utensile ID"));
     setSelectedMaterialId(savedText(record.notes, "Materiale ID"));
     setSelectedCatalogId(savedText(record.notes, "Catalogo ID"));
+    setSelectedJobId(savedText(record.notes, "Lavorazione ID"));
     setMaterialGroup(savedMaterialGroup(record.notes));
+    setStrategy(savedStrategy(record.notes));
+    setCatalogBase(null);
+    setOutcome(savedOutcome(record.notes));
+    setFavorite(/^s[iì]$/i.test(savedText(record.notes, "Preferito")));
+    setExperienceNotes(savedText(record.notes, "Note risultato"));
     setValues({
       articleCode: savedText(record.notes, "Codice articolo"),
       diameter: savedNumber(record.notes, "Diametro"),
@@ -356,12 +526,26 @@ export default function CuttingParametersPage({
     const catalogId = savedText(record.notes, "Catalogo ID");
     const feedPerTooth = savedNumber(record.notes, "fz");
     const tool = record.tool ? normalizeToolDetails(record) : null;
+    const parameterFeed = parseNumber(
+      parameterOperation === "milling"
+        ? feedPerTooth
+        : savedNumber(record.notes, "f")
+    );
+    const parameterSpeed = parseNumber(savedNumber(record.notes, "Vc"));
 
     setOperation(parameterOperation);
     setTab(parameterOperation);
     setEditingCalculationId("");
     setCalculationName("");
+    setOutcome("Da testare");
+    setFavorite(false);
+    setExperienceNotes("");
     setSelectedToolId("");
+    setStrategy("recommended");
+    setCatalogBase({
+      cuttingSpeed: parameterSpeed,
+      feed: parameterFeed,
+    });
     setSelectedCatalogId(
       catalogs.some((catalog) => catalog.id === catalogId)
         ? catalogId
@@ -445,6 +629,56 @@ export default function CuttingParametersPage({
     }
   }
 
+  async function toggleSavedFavorite(record: RecordItem) {
+    const nextFavorite = !/^s[iì]$/i.test(
+      savedText(record.notes, "Preferito")
+    );
+
+    try {
+      await saveCalculation({
+        ...record,
+        notes: replaceNoteValue(
+          record.notes,
+          "Preferito",
+          nextFavorite ? "Sì" : "No"
+        ),
+        updatedAt: new Date().toISOString(),
+      });
+      notifySuccess(
+        nextFavorite
+          ? `Calcolo “${record.title}” aggiunto ai preferiti.`
+          : `Calcolo “${record.title}” rimosso dai preferiti.`
+      );
+    } catch {
+      // L'errore viene già mostrato da useRecords.
+    }
+  }
+
+  function printSavedCalculation(record: RecordItem) {
+    const printWindow = window.open("", "_blank", "width=900,height=760");
+
+    if (!printWindow) {
+      setLocalError(
+        "Il browser ha bloccato la scheda di stampa. Consenti i popup e riprova."
+      );
+      return;
+    }
+
+    const rows = record.notes
+      .split("\n")
+      .filter((line) => line && !line.startsWith("["))
+      .map((line) => {
+        const separator = line.indexOf(":");
+        const label = separator >= 0 ? line.slice(0, separator) : "Nota";
+        const value = separator >= 0 ? line.slice(separator + 1) : line;
+        return `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value.trim())}</td></tr>`;
+      })
+      .join("");
+
+    printWindow.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${escapeHtml(record.title)}</title><style>body{font-family:Arial,sans-serif;color:#10243d;margin:34px}header{border-bottom:3px solid #1769e0;padding-bottom:14px;margin-bottom:22px}header span{color:#1769e0;font-weight:700;font-size:12px}h1{margin:5px 0;font-size:26px}p{color:#53697d}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #d8e2eb;padding:8px 10px;text-align:left;vertical-align:top}th{width:32%;background:#eef5fc}footer{margin-top:22px;color:#718395;font-size:10px}@media print{button{display:none}}</style></head><body><header><span>SMART CNC MANAGER · SCHEDA DI LAVORAZIONE</span><h1>${escapeHtml(record.title)}</h1><p>${escapeHtml(record.subtitle)}</p></header><table>${rows}</table><footer>Documento generato il ${escapeHtml(new Date().toLocaleString("it-IT"))}. Verificare sempre i dati del costruttore e i limiti della macchina.</footer><script>window.onload=()=>window.print();<\/script></body></html>`);
+    printWindow.document.close();
+  }
+
   async function handleSave() {
     if (!calculationName.trim()) {
       setLocalError("Inserisci un nome per il calcolo prima di salvarlo.");
@@ -474,6 +708,7 @@ export default function CuttingParametersPage({
     const existingRecord = savedCalculations.find(
       (record) => record.id === editingCalculationId
     );
+    const job = jobs.find((item) => item.id === selectedJobId);
 
     const notes = [
       calculationMarker,
@@ -483,11 +718,19 @@ export default function CuttingParametersPage({
       selectedToolId ? `Utensile ID: ${selectedToolId}` : "",
       selectedMaterialId ? `Materiale ID: ${selectedMaterialId}` : "",
       selectedCatalogId ? `Catalogo ID: ${selectedCatalogId}` : "",
+      selectedJobId ? `Lavorazione ID: ${selectedJobId}` : "",
       tool ? `Utensile: ${tool.title}` : "Utensile: inserimento manuale",
       material
         ? `Materiale: ${material.title} (ISO ${materialGroup})`
         : `Materiale: manuale (ISO ${materialGroup})`,
       catalog ? `Catalogo di riferimento: ${catalog.title}` : "",
+      job ? `Lavorazione collegata: ${job.title}` : "",
+      `Strategia: ${strategyLabel(strategy)}`,
+      `Esito: ${outcome}`,
+      `Preferito: ${favorite ? "Sì" : "No"}`,
+      experienceNotes.trim()
+        ? `Note risultato: ${singleLine(experienceNotes)}`
+        : "",
       `Diametro: ${formatNumber(numeric.diameter)} mm`,
       operation === "milling"
         ? `Taglienti: ${formatNumber(numeric.teeth)}`
@@ -521,7 +764,7 @@ export default function CuttingParametersPage({
         module: "cutting",
         title: calculationName.trim(),
         subtitle: `${operationLabel} · ${code} · n ${formatNumber(rpm)} rpm · Vf ${formatNumber(feed)} mm/min`,
-        status: "Salvato",
+        status: outcome === "Da testare" ? "Salvato" : outcome,
         machineId: selectedMachineId,
         machine: machineName,
         notes,
@@ -699,6 +942,29 @@ export default function CuttingParametersPage({
         </div>
       )}
 
+      <ProfessionalCuttingPanel
+        strategy={strategy}
+        materialGroup={materialGroup}
+        hasCatalogBase={Boolean(catalogBase)}
+        onStrategyChange={applyStrategy}
+        jobs={jobs}
+        selectedJobId={selectedJobId}
+        onJobChange={setSelectedJobId}
+        outcome={outcome}
+        onOutcomeChange={setOutcome}
+        favorite={favorite}
+        onFavoriteChange={setFavorite}
+        experienceNotes={experienceNotes}
+        onExperienceNotesChange={setExperienceNotes}
+        machineName={
+          selectedMachine
+            ? `${selectedMachine.brand} ${selectedMachine.model}`.trim()
+            : ""
+        }
+        machineChecks={machineChecks}
+        onApplyMachineLimits={applyMachineLimits}
+      />
+
       <div className="cuttingTabs" role="tablist" aria-label="Calcoli disponibili">
         {([
           ["milling", "Fresatura"],
@@ -830,6 +1096,8 @@ export default function CuttingParametersPage({
           onEdit={editSavedCalculation}
           onDelete={removeSavedCalculation}
           onClear={clearSavedHistory}
+          onFavorite={toggleSavedFavorite}
+          onPrint={printSavedCalculation}
         />
 
         <div className="cuttingActions">
@@ -883,6 +1151,8 @@ function SavedCalculations({
   onEdit,
   onDelete,
   onClear,
+  onFavorite,
+  onPrint,
 }: {
   records: RecordItem[];
   operation: CuttingOperation;
@@ -890,11 +1160,17 @@ function SavedCalculations({
   onEdit: (record: RecordItem) => void;
   onDelete: (record: RecordItem) => void | Promise<void>;
   onClear: (records: RecordItem[]) => void | Promise<void>;
+  onFavorite: (record: RecordItem) => void | Promise<void>;
+  onPrint: (record: RecordItem) => void;
 }) {
   const [query, setQuery] = useState("");
   const [visibleLimit, setVisibleLimit] = useState(24);
   const matchingRecords = records
-    .filter((record) => savedOperation(record) === operation);
+    .filter((record) => savedOperation(record) === operation)
+    .sort(
+      (first, second) =>
+        Number(isFavorite(second)) - Number(isFavorite(first))
+    );
   const normalizedQuery = query.trim().toLowerCase();
   const filteredRecords = normalizedQuery
     ? matchingRecords.filter((record) =>
@@ -956,11 +1232,22 @@ function SavedCalculations({
               <article key={record.id}>
                 <div className="cuttingSavedTop">
                   <span>{code}</span>
-                  <small>{formatDateTime(record.updatedAt)}</small>
+                  <div>
+                    {isFavorite(record) && (
+                      <Star size={13} fill="currentColor" />
+                    )}
+                    <small>{formatDateTime(record.updatedAt)}</small>
+                  </div>
                 </div>
                 <b>{record.title}</b>
                 <p>{record.subtitle}</p>
                 {record.machine && <small>Macchina: {record.machine}</small>}
+                <small>
+                  Esito: {savedText(record.notes, "Esito") || "Da testare"}
+                  {savedText(record.notes, "Strategia")
+                    ? ` · ${savedText(record.notes, "Strategia")}`
+                    : ""}
+                </small>
                 <div className="cuttingSavedActions">
                   <button
                     type="button"
@@ -971,6 +1258,26 @@ function SavedCalculations({
                   >
                     <Pencil size={15} />
                     Modifica
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onFavorite(record)}
+                    disabled={busy}
+                    title={isFavorite(record) ? "Rimuovi dai preferiti" : "Aggiungi ai preferiti"}
+                    aria-label={isFavorite(record) ? `Rimuovi ${record.title} dai preferiti` : `Aggiungi ${record.title} ai preferiti`}
+                  >
+                    <Star size={15} fill={isFavorite(record) ? "currentColor" : "none"} />
+                    {isFavorite(record) ? "Preferito" : "Preferiti"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onPrint(record)}
+                    disabled={busy}
+                    title="Stampa o salva in PDF"
+                    aria-label={`Stampa ${record.title}`}
+                  >
+                    <Printer size={15} />
+                    PDF
                   </button>
                   <button
                     type="button"
@@ -1175,6 +1482,71 @@ function parseSpindleLimit(value: string) {
     : raw.replace(",", ".");
   const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseMachineNoteLimit(value: string, pattern: RegExp) {
+  const raw = value.match(pattern)?.[1];
+  if (!raw) return 0;
+  const parsed = Number.parseFloat(raw.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function strategyLabel(strategy: CuttingStrategy) {
+  if (strategy === "conservative") return "Prudente";
+  if (strategy === "recommended") return "Consigliato";
+  if (strategy === "productive") return "Produttivo";
+  return "Manuale";
+}
+
+function savedStrategy(notes: string): CuttingStrategy {
+  const value = savedText(notes, "Strategia").toLowerCase();
+  if (value === "prudente") return "conservative";
+  if (value === "consigliato") return "recommended";
+  if (value === "produttivo") return "productive";
+  return "manual";
+}
+
+function savedOutcome(notes: string): CuttingOutcome {
+  const value = savedText(notes, "Esito") as CuttingOutcome;
+  return [
+    "Da testare",
+    "Ottimo",
+    "Regolare",
+    "Vibrazioni",
+    "Usura elevata",
+    "Rottura utensile",
+  ].includes(value)
+    ? value
+    : "Da testare";
+}
+
+function isFavorite(record: RecordItem) {
+  return /^s[iì]$/i.test(savedText(record.notes, "Preferito"));
+}
+
+function singleLine(value: string) {
+  return value.replace(/\s*\r?\n\s*/g, " · ").trim();
+}
+
+function replaceNoteValue(notes: string, label: string, value: string) {
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(^|\\n)${escapedLabel}:.*(?=\\n|$)`, "i");
+  return pattern.test(notes)
+    ? notes.replace(pattern, `$1${label}: ${value}`)
+    : `${notes}\n${label}: ${value}`;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;",
+    };
+    return entities[character];
+  });
 }
 
 function formatNumber(value: number, decimals = 0) {

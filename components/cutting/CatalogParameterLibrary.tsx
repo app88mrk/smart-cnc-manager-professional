@@ -37,6 +37,7 @@ type ParameterRow = {
   catalogName: string;
   page: string;
   complete: boolean;
+  confidence: number;
 };
 
 const operationLabels: Record<CuttingOperation, string> = {
@@ -162,6 +163,49 @@ export default function CatalogParameterLibrary({
     setVisibleLimit(50);
   }
 
+  function exportCsv() {
+    const header = [
+      "Codice articolo",
+      "Descrizione",
+      "Operazione",
+      "Diametro mm",
+      "Taglienti",
+      "Vc m/min",
+      operation === "milling" ? "fz mm/dente" : "f mm/giro",
+      "Materiale utensile",
+      "Catalogo",
+      "Pagina",
+      "Affidabilita %",
+    ];
+    const lines = filteredRows.map((row) =>
+      [
+        row.code,
+        row.record.title,
+        operationLabels[operation],
+        row.diameter || "",
+        row.teeth || "",
+        row.cuttingSpeed || "",
+        row.feed || "",
+        row.material,
+        row.catalogName,
+        row.page,
+        row.confidence,
+      ]
+        .map(csvCell)
+        .join(";")
+    );
+    const blob = new Blob(
+      [`\uFEFF${[header.map(csvCell).join(";"), ...lines].join("\r\n")}`],
+      { type: "text/csv;charset=utf-8" }
+    );
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `parametri-${operationLabels[operation]}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <section className="catalogParameterLibrary">
       <div className="catalogParameterHead">
@@ -269,7 +313,10 @@ export default function CatalogParameterLibrary({
 
           <div className="catalogParameterResultBar">
             <span>{filteredRows.length} parametri trovati</span>
-            <button type="button" onClick={resetFilters}>Azzera filtri</button>
+            <div>
+              <button type="button" onClick={exportCsv}>Esporta CSV</button>
+              <button type="button" onClick={resetFilters}>Azzera filtri</button>
+            </div>
           </div>
 
           {filteredRows.length ? (
@@ -298,7 +345,7 @@ export default function CatalogParameterLibrary({
                           ) : (
                             <AlertTriangle size={13} />
                           )}
-                          {row.complete ? "Completo" : "Verifica"}
+                          {row.complete ? "Completo" : "Verifica"} · {row.confidence}%
                         </span>
                       </td>
                       <td><b>{row.code || "—"}</b></td>
@@ -381,6 +428,18 @@ function parameterRow(
     feed > 0 &&
     (operation === "turning" || diameter > 0) &&
     (operation !== "milling" || teeth > 0);
+  const confidence = parameterConfidence({
+    code:
+      savedText(record.notes, "Codice articolo") ||
+      record.tool?.code ||
+      "",
+    title: record.title,
+    operation,
+    diameter,
+    teeth,
+    cuttingSpeed,
+    feed,
+  });
 
   return {
     record,
@@ -402,6 +461,7 @@ function parameterRow(
     catalogName: catalogName.replace(/\.[^.]+$/, ""),
     page: savedText(record.notes, "Pagina catalogo"),
     complete,
+    confidence,
   };
 }
 
@@ -447,4 +507,28 @@ function formatNumber(value: number, decimals = 2) {
   return new Intl.NumberFormat("it-IT", {
     maximumFractionDigits: decimals,
   }).format(value);
+}
+
+function parameterConfidence(values: {
+  code: string;
+  title: string;
+  operation: CuttingOperation | null;
+  diameter: number;
+  teeth: number;
+  cuttingSpeed: number;
+  feed: number;
+}) {
+  let score = 0;
+  if (values.code) score += 15;
+  if (values.title) score += 15;
+  if (values.operation) score += 10;
+  if (values.operation === "turning" || values.diameter > 0) score += 15;
+  if (values.cuttingSpeed > 0) score += 20;
+  if (values.feed > 0) score += 20;
+  if (values.operation !== "milling" || values.teeth > 0) score += 5;
+  return score;
+}
+
+function csvCell(value: string | number) {
+  return `"${String(value).replace(/"/g, '""')}"`;
 }
