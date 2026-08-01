@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import CatalogImporter from "@/components/cutting/CatalogImporter";
+import CatalogParameterLibrary from "@/components/cutting/CatalogParameterLibrary";
 import {
   calculateFeed,
   calculateFeedForTargetChipThickness,
@@ -68,6 +69,7 @@ type Props = {
 
 const catalogMarker = "[CATALOGO_PARAMETRI]";
 const calculationMarker = "[CALCOLO_PARAMETRI_V5]";
+const importedParameterMarker = "[IMPORT_CATALOGO]";
 
 const operationLabels: Record<CuttingOperation, string> = {
   milling: "Fresatura",
@@ -128,10 +130,18 @@ export default function CuttingParametersPage({
     () =>
       records.filter(
         (record) =>
-          record.module === "cutting" ||
+          (record.module === "cutting" &&
+            !record.notes.includes(importedParameterMarker)) ||
           (record.module === "jobs" &&
             (record.notes.includes(calculationMarker) ||
               /^(Fresatura|Foratura|Tornitura)\s*·/i.test(record.title)))
+      ),
+    [records]
+  );
+  const catalogParameters = useMemo(
+    () =>
+      records.filter(
+        (record) => record.notes.includes(importedParameterMarker)
       ),
     [records]
   );
@@ -151,6 +161,7 @@ export default function CuttingParametersPage({
   const [editingCalculationId, setEditingCalculationId] =
     useState("");
   const [localError, setLocalError] = useState("");
+  const [catalogManagerOpen, setCatalogManagerOpen] = useState(false);
 
   const numeric = useMemo(
     () => ({
@@ -332,6 +343,59 @@ export default function CuttingParametersPage({
     });
     setLocalError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function useCatalogParameter(record: RecordItem) {
+    const parameterOperation = savedOperation(record);
+
+    if (!parameterOperation) {
+      setLocalError("Il tipo di lavorazione del parametro non è riconoscibile.");
+      return;
+    }
+
+    const catalogId = savedText(record.notes, "Catalogo ID");
+    const feedPerTooth = savedNumber(record.notes, "fz");
+    const tool = record.tool ? normalizeToolDetails(record) : null;
+
+    setOperation(parameterOperation);
+    setTab(parameterOperation);
+    setEditingCalculationId("");
+    setCalculationName("");
+    setSelectedToolId("");
+    setSelectedCatalogId(
+      catalogs.some((catalog) => catalog.id === catalogId)
+        ? catalogId
+        : ""
+    );
+    setValues((current) => ({
+      ...current,
+      articleCode:
+        savedText(record.notes, "Codice articolo") || tool?.code || "",
+      diameter:
+        positiveSavedNumber(record.notes, "Diametro") ||
+        positiveText(tool?.diameter || "", "0"),
+      teeth:
+        positiveSavedNumber(record.notes, "Taglienti") ||
+        positiveText(tool?.fluteCount || "", "0"),
+      cuttingSpeed: savedNumber(record.notes, "Vc"),
+      feedPerTooth,
+      feedPerRev: savedNumber(record.notes, "f"),
+      axialDepth: savedNumber(record.notes, "ap"),
+      radialWidth: savedNumber(record.notes, "ae"),
+      targetChipThickness:
+        parameterOperation === "milling"
+          ? feedPerTooth
+          : current.targetChipThickness,
+    }));
+    setLocalError("");
+    notifySuccess(
+      `Parametri “${record.title}” caricati nel calcolatore.`
+    );
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector(".cuttingTabs")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   async function removeSavedCalculation(record: RecordItem) {
@@ -601,16 +665,39 @@ export default function CuttingParametersPage({
         </label>
       </div>
 
-      <CatalogImporter
-        existingCalculations={savedCalculations}
+      <CatalogParameterLibrary
+        records={catalogParameters}
         catalogs={catalogs}
+        operation={operation}
         busy={busy}
-        saveCatalog={saveCatalog}
-        saveImportedParameters={saveImportedParameters}
-        deleteCatalog={deleteCatalog}
-        notifySuccess={notifySuccess}
-        selectCatalog={setSelectedCatalogId}
+        onUse={useCatalogParameter}
+        onManageCatalogs={() => setCatalogManagerOpen(true)}
       />
+
+      {catalogManagerOpen && (
+        <div className="catalogManagerArea">
+          <div className="catalogManagerBar">
+            <b>Gestione cataloghi</b>
+            <button
+              type="button"
+              onClick={() => setCatalogManagerOpen(false)}
+              disabled={busy}
+            >
+              Chiudi gestione
+            </button>
+          </div>
+          <CatalogImporter
+            existingParameters={catalogParameters}
+            catalogs={catalogs}
+            busy={busy}
+            saveCatalog={saveCatalog}
+            saveImportedParameters={saveImportedParameters}
+            deleteCatalog={deleteCatalog}
+            notifySuccess={notifySuccess}
+            selectCatalog={setSelectedCatalogId}
+          />
+        </div>
+      )}
 
       <div className="cuttingTabs" role="tablist" aria-label="Calcoli disponibili">
         {([
@@ -1106,10 +1193,19 @@ function savedOperation(record: RecordItem): CuttingOperation | null {
     return explicit.toLowerCase() as CuttingOperation;
   }
 
+  if (record.tool?.category) {
+    return operationFromTool(record.tool.category);
+  }
+
   if (/^Fresatura\s*·/i.test(record.title)) return "milling";
   if (/^Foratura\s*·/i.test(record.title)) return "drilling";
   if (/^Tornitura\s*·/i.test(record.title)) return "turning";
   return null;
+}
+
+function positiveSavedNumber(notes: string, label: string) {
+  const value = savedNumber(notes, label);
+  return parseNumber(value) > 0 ? value : "";
 }
 
 function savedText(notes: string, label: string) {

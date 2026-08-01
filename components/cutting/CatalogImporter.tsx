@@ -21,7 +21,7 @@ import {
 import { RecordItem } from "@/types";
 
 type Props = {
-  existingCalculations: RecordItem[];
+  existingParameters: RecordItem[];
   catalogs: RecordItem[];
   busy: boolean;
   saveCatalog: (
@@ -41,7 +41,7 @@ type Props = {
 const maximumUploadSize = 500 * 1024 * 1024;
 
 export default function CatalogImporter({
-  existingCalculations,
+  existingParameters,
   catalogs,
   busy,
   saveCatalog,
@@ -107,7 +107,7 @@ export default function CatalogImporter({
       );
       const validated = validateCatalogCandidates(
         candidates,
-        existingCalculations
+        existingParameters
       );
       setRows(validated);
 
@@ -202,7 +202,7 @@ export default function CatalogImporter({
       setImportPhase("catalog");
       await archiveCatalog(catalogId);
       notifySuccess(
-        `Catalogo archiviato e ${records.length} parametri aggiunti allo storico.`
+        `Catalogo archiviato e ${records.length} parametri aggiunti alla libreria.`
       );
       clearPreview();
     } catch (cause) {
@@ -212,7 +212,7 @@ export default function CatalogImporter({
           : "Si è verificato un errore durante l'importazione.";
       setError(
         importedCount
-          ? `${importedCount} parametri sono stati aggiunti allo storico. Il file del catalogo non è stato archiviato: ${message}`
+          ? `${importedCount} parametri sono stati aggiunti alla libreria. Il file del catalogo non è stato archiviato: ${message}`
           : `Importazione non riuscita: ${message}`
       );
     } finally {
@@ -256,7 +256,7 @@ export default function CatalogImporter({
 
   async function removeCatalog(catalog: RecordItem) {
     const confirmed = window.confirm(
-      `Eliminare definitivamente il catalogo “${catalog.title}” e il relativo file? I parametri già presenti nello storico resteranno disponibili.`
+      `Eliminare definitivamente il catalogo “${catalog.title}” e il relativo file? I parametri già importati nella libreria resteranno disponibili.`
     );
 
     if (!confirmed) return;
@@ -294,7 +294,7 @@ export default function CatalogImporter({
 
         <label className={`cuttingCatalogUpload ${working ? "disabled" : ""}`}>
           <FileUp size={17} />
-          {analyzing ? "Analisi…" : "Seleziona catalogo"}
+          {analyzing ? "Analisi…" : "Carica o sostituisci"}
           <input
             type="file"
             accept=".pdf,.xlsx,.xls,.csv,.json,.tsv,.txt"
@@ -336,7 +336,7 @@ export default function CatalogImporter({
             )}
             <span>
               {importPhase === "tools"
-                ? `Salvataggio di ${selectedCount} parametri nello storico…`
+                ? `Salvataggio di ${selectedCount} parametri nella libreria…`
                 : uploadPercent < 100
                   ? "Parametri salvati. Caricamento catalogo su Firebase…"
                   : "Catalogo caricato. Finalizzazione…"}
@@ -484,6 +484,9 @@ export default function CatalogImporter({
                     ? ` · ${formatBytes(catalog.fileSize)}`
                     : ""}
                 </small>
+                <small>
+                  {catalogParameterCount(catalog)} parametri riconosciuti
+                </small>
               </div>
               <div className="cuttingCatalogCardActions">
                 {catalog.fileUrl && (
@@ -548,6 +551,13 @@ function formatBytes(bytes: number) {
   }
 
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function catalogParameterCount(catalog: RecordItem) {
+  const value = catalog.notes.match(
+    /(?:Parametri|Utensili) riconosciuti:\s*(\d+)/i
+  )?.[1];
+  return value ? Number(value) : 0;
 }
 
 function createId(prefix: string) {

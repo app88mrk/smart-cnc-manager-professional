@@ -82,10 +82,10 @@ export async function analyzeCatalogFile(
 
 export function validateCatalogCandidates(
   candidates: CatalogCandidate[],
-  existingCalculations: RecordItem[]
+  existingParameters: RecordItem[]
 ) {
   const existingCodes = new Set(
-    existingCalculations
+    existingParameters
       .map(
         (record) =>
           record.tool?.code ||
@@ -161,8 +161,13 @@ export function candidateToCalculationRecord(
               : 1)
         )
       : 0;
+  const complete =
+    candidate.cuttingSpeed > 0 &&
+    candidate.feed > 0 &&
+    (operation === "turning" || candidate.diameter > 0) &&
+    (operation !== "milling" || candidate.teeth > 0);
   const notes = [
-    "[CALCOLO_PARAMETRI_V5]",
+    "[PARAMETRO_CATALOGO_V1]",
     "[IMPORT_CATALOGO]",
     `Tipo calcolo: ${operation}`,
     `Operazione: ${operationLabel}`,
@@ -171,6 +176,14 @@ export function candidateToCalculationRecord(
     `Catalogo ID: ${catalogId}`,
     candidate.sourcePage ? `Pagina catalogo: ${candidate.sourcePage}` : "",
     `Utensile: ${candidate.name}`,
+    `Categoria utensile: ${candidate.category}`,
+    candidate.toolMaterial
+      ? `Materiale utensile: ${candidate.toolMaterial}`
+      : "",
+    candidate.coating ? `Rivestimento: ${candidate.coating}` : "",
+    candidate.cuttingLength > 0
+      ? `Lunghezza tagliente: ${decimalText(candidate.cuttingLength)} mm`
+      : "",
     candidate.diameter > 0
       ? `Diametro: ${decimalText(candidate.diameter)} mm`
       : "Diametro: 0 mm",
@@ -215,7 +228,7 @@ export function candidateToCalculationRecord(
     } m/min · ${feedLabel} ${
       candidate.feed > 0 ? decimalText(candidate.feed) : "—"
     } ${feedUnit}`,
-    status: "Catalogo",
+    status: complete ? "Completo" : "Da verificare",
     machineId: "",
     machine: "",
     notes,
