@@ -349,8 +349,11 @@ function textItemsToLines(
 
 function parsePdfPage(lines: string[], pageNumber: number) {
   const pageText = lines.join("\n");
-  const category = inferCategory("", pageText);
-  const productName = detectProductName(lines, category);
+  const pageCategory = inferCategory("", pageText);
+  const productName = detectProductName(lines, pageCategory);
+  const productCategory = inferCategory("", productName);
+  const category =
+    productCategory === "Altro" ? pageCategory : productCategory;
   const toolMaterial = detectToolMaterial(pageText);
   const coating = detectCoating(pageText);
   const pageCodes = unique(
@@ -712,15 +715,21 @@ function getValue(row: UnknownRow, field: keyof typeof aliases) {
 }
 
 function inferCategory(value: unknown, context: string): ToolCategory {
-  const source = `${textValue(value)} ${context}`.toLowerCase();
+  const explicitCategory = categoryFromText(textValue(value));
+  if (explicitCategory) return explicitCategory;
+  return categoryFromText(context) || "Altro";
+}
 
-  if (/punta|drill/.test(source)) return "Punta";
-  if (/maschio|tap\b/.test(source)) return "Maschio";
+function categoryFromText(value: string): ToolCategory | null {
+  const source = value.toLowerCase();
+
+  if (/fresa|frese|milling|mill\b/.test(source)) return "Fresa";
+  if (/punta|punte|drill/.test(source)) return "Punta";
+  if (/maschio|maschi|tap\b/.test(source)) return "Maschio";
   if (/bareno|alesator|reamer/.test(source)) return "Bareno";
-  if (/inserto|placchetta|insert\b/.test(source)) return "Inserto";
+  if (/inserto|inserti|placchetta|placchette|insert\b/.test(source)) return "Inserto";
   if (/tornitura|turning|cnmg|dnmg|wnmg/.test(source)) return "Tornitura";
-  if (/fresa|milling|mill\b/.test(source)) return "Fresa";
-  return "Altro";
+  return null;
 }
 
 function createCandidate(

@@ -561,12 +561,21 @@ export default function CuttingParametersPage({
     }
 
     const catalogId = savedText(record.notes, "Catalogo ID");
-    const feedPerTooth = savedNumber(record.notes, "fz");
+    const savedFeedPerTooth = savedNumber(record.notes, "fz");
+    const savedFeedPerRev = savedNumber(record.notes, "f");
+    const feedPerTooth =
+      parseNumber(savedFeedPerTooth) > 0
+        ? savedFeedPerTooth
+        : parameterOperation === "milling"
+          ? savedFeedPerRev
+          : "0";
     const tool = record.tool ? normalizeToolDetails(record) : null;
     const parameterFeed = parseNumber(
       parameterOperation === "milling"
         ? feedPerTooth
-        : savedNumber(record.notes, "f")
+        : parseNumber(savedFeedPerRev) > 0
+          ? savedFeedPerRev
+          : savedFeedPerTooth
     );
     const parameterSpeed = parseNumber(savedNumber(record.notes, "Vc"));
 
@@ -600,7 +609,12 @@ export default function CuttingParametersPage({
         positiveText(tool?.fluteCount || "", "0"),
       cuttingSpeed: savedNumber(record.notes, "Vc"),
       feedPerTooth,
-      feedPerRev: savedNumber(record.notes, "f"),
+      feedPerRev:
+        parseNumber(savedFeedPerRev) > 0
+          ? savedFeedPerRev
+          : parameterOperation !== "milling"
+            ? savedFeedPerTooth
+            : "0",
       axialDepth: savedNumber(record.notes, "ap"),
       radialWidth: savedNumber(record.notes, "ae"),
       targetChipThickness:
@@ -673,6 +687,31 @@ export default function CuttingParametersPage({
       notifySuccess(`Calcolo “${record.title}” eliminato dallo storico.`);
     } catch {
       // L'errore viene già mostrato da useRecords.
+    }
+  }
+
+  async function removeCatalogParameters(recordsToDelete: RecordItem[]) {
+    if (!recordsToDelete.length) return false;
+
+    const confirmed = window.confirm(
+      recordsToDelete.length === 1
+        ? `Eliminare il parametro catalogo “${recordsToDelete[0].title}”? Il PDF originale resterà nell’archivio.`
+        : `Eliminare definitivamente i ${recordsToDelete.length} parametri catalogo selezionati? I PDF originali resteranno nell’archivio.`
+    );
+
+    if (!confirmed) return false;
+
+    try {
+      await deleteCalculations(recordsToDelete);
+      notifySuccess(
+        recordsToDelete.length === 1
+          ? "Parametro catalogo eliminato."
+          : `${recordsToDelete.length} parametri catalogo eliminati.`
+      );
+      return true;
+    } catch {
+      // L'errore viene già mostrato da useRecords.
+      return false;
     }
   }
 
@@ -990,6 +1029,7 @@ export default function CuttingParametersPage({
         operation={operation}
         busy={busy}
         onUse={useCatalogParameter}
+        onDelete={removeCatalogParameters}
         onManageCatalogs={() => setCatalogManagerOpen(true)}
       />
 
@@ -1644,6 +1684,13 @@ function formatNumber(value: number, decimals = 0) {
 }
 
 function savedOperation(record: RecordItem): CuttingOperation | null {
+  if (record.notes.includes(importedParameterMarker)) {
+    const describedOperation = operationFromImportedDescription(
+      `${savedText(record.notes, "Categoria utensile")} ${record.title}`
+    );
+    if (describedOperation) return describedOperation;
+  }
+
   const explicit = record.notes.match(
     /Tipo calcolo:\s*(milling|drilling|turning)/i
   )?.[1];
@@ -1659,6 +1706,19 @@ function savedOperation(record: RecordItem): CuttingOperation | null {
   if (/^Fresatura\s*·/i.test(record.title)) return "milling";
   if (/^Foratura\s*·/i.test(record.title)) return "drilling";
   if (/^Tornitura\s*·/i.test(record.title)) return "turning";
+  return null;
+}
+
+function operationFromImportedDescription(
+  value: string
+): CuttingOperation | null {
+  if (/\b(fresa|frese|milling|mill)\b/i.test(value)) return "milling";
+  if (/\b(punta|punte|drill|maschio|maschi|tap|bareno|alesatore|alesatori|reamer)\b/i.test(value)) {
+    return "drilling";
+  }
+  if (/\b(tornitura|turning|inserto|inserti|placchetta|placchette|cnmg|dnmg|wnmg)\b/i.test(value)) {
+    return "turning";
+  }
   return null;
 }
 

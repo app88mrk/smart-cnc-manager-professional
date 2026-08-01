@@ -7,6 +7,7 @@ import {
   Database,
   FileUp,
   Search,
+  Trash2,
 } from "lucide-react";
 
 import { CuttingOperation } from "@/lib/cuttingCalculations";
@@ -18,6 +19,7 @@ type Props = {
   operation: CuttingOperation;
   busy: boolean;
   onUse: (record: RecordItem) => void;
+  onDelete: (records: RecordItem[]) => Promise<boolean>;
   onManageCatalogs: () => void;
 };
 
@@ -52,6 +54,7 @@ export default function CatalogParameterLibrary({
   operation,
   busy,
   onUse,
+  onDelete,
   onManageCatalogs,
 }: Props) {
   const [query, setQuery] = useState("");
@@ -61,6 +64,7 @@ export default function CatalogParameterLibrary({
   const [qualityFilter, setQualityFilter] =
     useState<QualityFilter>("all");
   const [visibleLimit, setVisibleLimit] = useState(50);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const catalogNames = useMemo(() => {
     const names = new Map(catalogs.map((catalog) => [catalog.id, catalog.title]));
@@ -153,6 +157,12 @@ export default function CatalogParameterLibrary({
   ]);
 
   const visibleRows = filteredRows.slice(0, visibleLimit);
+  const selectedRows = operationRows.filter((row) =>
+    selectedIds.includes(row.record.id)
+  );
+  const allVisibleSelected =
+    visibleRows.length > 0 &&
+    visibleRows.every((row) => selectedIds.includes(row.record.id));
 
   function resetFilters() {
     setQuery("");
@@ -161,6 +171,37 @@ export default function CatalogParameterLibrary({
     setMaterialFilter("all");
     setQualityFilter("all");
     setVisibleLimit(50);
+  }
+
+  function toggleRow(recordId: string) {
+    setSelectedIds((current) =>
+      current.includes(recordId)
+        ? current.filter((id) => id !== recordId)
+        : [...current, recordId]
+    );
+  }
+
+  function toggleVisibleRows() {
+    const visibleIds = visibleRows.map((row) => row.record.id);
+
+    setSelectedIds((current) =>
+      allVisibleSelected
+        ? current.filter((id) => !visibleIds.includes(id))
+        : Array.from(new Set([...current, ...visibleIds]))
+    );
+  }
+
+  async function deleteRows(rowsToDelete: ParameterRow[]) {
+    if (!rowsToDelete.length) return;
+    const recordsToDelete = rowsToDelete.map((row) => row.record);
+    const deleted = await onDelete(recordsToDelete);
+
+    if (deleted) {
+      const deletedIds = new Set(recordsToDelete.map((record) => record.id));
+      setSelectedIds((current) =>
+        current.filter((id) => !deletedIds.has(id))
+      );
+    }
   }
 
   function exportCsv() {
@@ -314,6 +355,17 @@ export default function CatalogParameterLibrary({
           <div className="catalogParameterResultBar">
             <span>{filteredRows.length} parametri trovati</span>
             <div>
+              {selectedRows.length > 0 && (
+                <button
+                  type="button"
+                  className="catalogParameterDeleteSelected"
+                  onClick={() => deleteRows(selectedRows)}
+                  disabled={busy}
+                >
+                  <Trash2 size={14} />
+                  Elimina selezionati ({selectedRows.length})
+                </button>
+              )}
               <button type="button" onClick={exportCsv}>Esporta CSV</button>
               <button type="button" onClick={resetFilters}>Azzera filtri</button>
             </div>
@@ -324,6 +376,14 @@ export default function CatalogParameterLibrary({
               <table className="catalogParameterTable">
                 <thead>
                   <tr>
+                    <th className="catalogParameterSelectCell">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleVisibleRows}
+                        aria-label="Seleziona tutti i parametri visibili"
+                      />
+                    </th>
                     <th>Stato</th>
                     <th>Codice articolo</th>
                     <th>Descrizione</th>
@@ -338,6 +398,14 @@ export default function CatalogParameterLibrary({
                 <tbody>
                   {visibleRows.map((row) => (
                     <tr key={row.record.id}>
+                      <td className="catalogParameterSelectCell">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(row.record.id)}
+                          onChange={() => toggleRow(row.record.id)}
+                          aria-label={`Seleziona ${row.record.title}`}
+                        />
+                      </td>
                       <td>
                         <span className={`catalogParameterStatus ${row.complete ? "complete" : "verify"}`}>
                           {row.complete ? (
@@ -362,14 +430,26 @@ export default function CatalogParameterLibrary({
                         <small>{row.page ? `Pag. ${row.page}` : "Pagina non indicata"}</small>
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="catalogParameterUse"
-                          onClick={() => onUse(row.record)}
-                          disabled={busy}
-                        >
-                          Usa nel calcolo
-                        </button>
+                        <div className="catalogParameterRowActions">
+                          <button
+                            type="button"
+                            className="catalogParameterUse"
+                            onClick={() => onUse(row.record)}
+                            disabled={busy}
+                          >
+                            Usa nel calcolo
+                          </button>
+                          <button
+                            type="button"
+                            className="catalogParameterDelete"
+                            onClick={() => deleteRows([row])}
+                            disabled={busy}
+                            title="Elimina parametro importato"
+                            aria-label={`Elimina ${row.record.title}`}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -419,7 +499,9 @@ function parameterRow(
     numberValue(record.tool?.fluteCount || "");
   const cuttingSpeed = savedNumber(record.notes, "Vc");
   const feedLabel = operation === "milling" ? "fz" : "f";
-  const feed = savedNumber(record.notes, feedLabel);
+  const feed =
+    savedNumber(record.notes, feedLabel) ||
+    savedNumber(record.notes, feedLabel === "fz" ? "f" : "fz");
   const catalogId = savedText(record.notes, "Catalogo ID");
   const catalogName =
     catalogNames.get(catalogId) || savedText(record.notes, "Catalogo");
@@ -466,6 +548,11 @@ function parameterRow(
 }
 
 function savedOperation(record: RecordItem): CuttingOperation | null {
+  const describedOperation = operationFromDescription(
+    `${savedText(record.notes, "Categoria utensile")} ${record.title}`
+  );
+  if (describedOperation) return describedOperation;
+
   const operation = record.notes.match(
     /Tipo calcolo:\s*(milling|drilling|turning)/i
   )?.[1];
@@ -481,6 +568,17 @@ function savedOperation(record: RecordItem): CuttingOperation | null {
     return "turning";
   }
   return category ? "milling" : null;
+}
+
+function operationFromDescription(value: string): CuttingOperation | null {
+  if (/\b(fresa|frese|milling|mill)\b/i.test(value)) return "milling";
+  if (/\b(punta|punte|drill|maschio|maschi|tap|bareno|alesatore|alesatori|reamer)\b/i.test(value)) {
+    return "drilling";
+  }
+  if (/\b(tornitura|turning|inserto|inserti|placchetta|placchette|cnmg|dnmg|wnmg)\b/i.test(value)) {
+    return "turning";
+  }
+  return null;
 }
 
 function savedText(notes: string, label: string) {
