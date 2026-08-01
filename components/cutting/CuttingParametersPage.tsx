@@ -15,6 +15,9 @@ import {
 
 import CatalogImporter from "@/components/cutting/CatalogImporter";
 import CatalogParameterLibrary from "@/components/cutting/CatalogParameterLibrary";
+import HistoricalRecommendation, {
+  HistoricalValues,
+} from "@/components/cutting/HistoricalRecommendation";
 import ProfessionalCuttingPanel, {
   CuttingOutcome,
   CuttingStrategy,
@@ -254,6 +257,9 @@ export default function CuttingParametersPage({
   const selectedMachine = machines.find(
     (machine) => machine.id === selectedMachineId
   );
+  const selectedMaterial = materials.find(
+    (material) => material.id === selectedMaterialId
+  );
   const spindleLimit = parseSpindleLimit(selectedMachine?.spindle || "");
   const machinePowerLimit = parseMachineNoteLimit(
     selectedMachine?.notes || "",
@@ -331,6 +337,37 @@ export default function CuttingParametersPage({
     numeric.cuttingSpeed > 0 &&
     activeFeedValue > 0 &&
     (operation !== "milling" || numeric.teeth > 0);
+  const setupReadiness = [
+    {
+      label: "Codice articolo",
+      complete: Boolean(values.articleCode.trim()),
+      detail: values.articleCode.trim() || "Consigliato per confronti precisi",
+    },
+    {
+      label: "Materiale",
+      complete: true,
+      detail: selectedMaterial?.title || `Selezione manuale · ISO ${materialGroup}`,
+    },
+    {
+      label: "Parametri di taglio",
+      complete: validCalculation,
+      detail: validCalculation
+        ? "Diametro, Vc e avanzamento validi"
+        : "Completa diametro, Vc, avanzamento e taglienti",
+    },
+    {
+      label: "Macchina",
+      complete: Boolean(selectedMachineId),
+      detail: selectedMachine
+        ? `${selectedMachine.brand} ${selectedMachine.model}`.trim()
+        : "Consigliata per verificare i limiti",
+    },
+    {
+      label: "Nome del calcolo",
+      complete: Boolean(calculationName.trim()),
+      detail: calculationName.trim() || "Obbligatorio per il salvataggio",
+    },
+  ];
 
   function updateValue(key: keyof CalculatorValues, value: string) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -575,6 +612,45 @@ export default function CuttingParametersPage({
     notifySuccess(
       `Parametri “${record.title}” caricati nel calcolatore.`
     );
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector(".cuttingTabs")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function useHistoricalValues(historicalValues: HistoricalValues) {
+    setValues((current) => ({
+      ...current,
+      diameter: historicalValues.diameter,
+      teeth:
+        operation === "milling"
+          ? historicalValues.teeth
+          : current.teeth,
+      cuttingSpeed: historicalValues.cuttingSpeed,
+      feedPerTooth:
+        operation === "milling"
+          ? historicalValues.feedPerTooth
+          : current.feedPerTooth,
+      feedPerRev:
+        operation === "milling"
+          ? current.feedPerRev
+          : historicalValues.feedPerRev,
+      axialDepth: historicalValues.axialDepth,
+      radialWidth:
+        operation === "milling"
+          ? historicalValues.radialWidth
+          : current.radialWidth,
+      targetChipThickness:
+        operation === "milling"
+          ? historicalValues.feedPerTooth
+          : current.targetChipThickness,
+    }));
+    setCatalogBase(null);
+    setStrategy("manual");
+    setOutcome("Da testare");
+    setLocalError("");
+    notifySuccess("Valori medi della tua esperienza caricati nel calcolatore.");
     window.requestAnimationFrame(() => {
       document
         .querySelector(".cuttingTabs")
@@ -963,6 +1039,17 @@ export default function CuttingParametersPage({
         }
         machineChecks={machineChecks}
         onApplyMachineLimits={applyMachineLimits}
+      />
+
+      <HistoricalRecommendation
+        records={savedCalculations}
+        operation={operation}
+        materialGroup={materialGroup}
+        machineId={selectedMachineId}
+        articleCode={values.articleCode}
+        busy={busy}
+        readiness={setupReadiness}
+        onUse={useHistoricalValues}
       />
 
       <div className="cuttingTabs" role="tablist" aria-label="Calcoli disponibili">
