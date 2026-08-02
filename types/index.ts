@@ -101,6 +101,31 @@ export interface JobSheetDetails {
   approved: boolean;
   accountedToolMinutes: Record<string, number>;
 }
+export type ManualCategory =
+  | "catalog"
+  | "machine"
+  | "procedure"
+  | "drawing"
+  | "maintenance"
+  | "quality"
+  | "safety"
+  | "other";
+export type ManualConfidentiality = "Uso interno" | "Riservato" | "Pubblico";
+export interface ManualDetails {
+  version: 1;
+  category: ManualCategory;
+  documentCode: string;
+  manufacturer: string;
+  revision: string;
+  issueDate: string;
+  reviewDate: string;
+  language: string;
+  owner: string;
+  confidentiality: ManualConfidentiality;
+  tags: string[];
+  openCount: number;
+  lastOpenedAt: string;
+}
 export interface RecordItem {
   id: string;
   module: RecordModuleId;
@@ -119,6 +144,7 @@ export interface RecordItem {
   fileSize?: number;
   tool?: ToolDetails;
   jobSheet?: JobSheetDetails;
+  manual?: ManualDetails;
 }
 
 export interface Machine {

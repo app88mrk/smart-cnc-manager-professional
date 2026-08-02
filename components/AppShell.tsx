@@ -13,6 +13,7 @@ import NotificationCenter from "@/components/common/NotificationCenter";
 import CuttingParametersPage from "@/components/cutting/CuttingParametersPage";
 import Dashboard from "@/components/dashboard/Dashboard";
 import JobsPage from "@/components/jobs/JobsPage";
+import ManualForm from "@/components/manuals/ManualForm";
 import ManualsPage from "@/components/manuals/ManualsPage";
 import MachineDetail from "@/components/machines/MachineDetail";
 import MachineForm from "@/components/machines/MachineForm";
@@ -39,6 +40,7 @@ import {
 import { firebaseConfigured } from "@/lib/firebase";
 import { isRecordModuleId } from "@/lib/moduleConfigs";
 import { modules } from "@/lib/modules";
+import { normalizeManualDetails } from "@/lib/manuals";
 import {
   Machine,
   MaintenanceRecord,
@@ -337,6 +339,26 @@ export default function AppShell() {
     }
   }
 
+  async function trackManualOpen(record: RecordItem) {
+    const manual = normalizeManualDetails(record);
+    try {
+      await saveRecord({
+        record: {
+          ...record,
+          manual: {
+            ...manual,
+            openCount: manual.openCount + 1,
+            lastOpenedAt: new Date().toISOString(),
+          },
+        },
+        attachment: null,
+        background: true,
+      });
+    } catch {
+      // L’apertura del documento resta disponibile anche se il contatore non si aggiorna.
+    }
+  }
+
   async function toggleMaintenanceChecklist(
     record: MaintenanceRecord,
     itemId: string
@@ -551,6 +573,7 @@ export default function AppShell() {
               })
             }
             onToggleTop={toggleManualTop}
+            onDocumentOpen={trackManualOpen}
           />
         ) : active === "tools" ? (
           <ToolsPage
@@ -712,7 +735,29 @@ export default function AppShell() {
         />
       )}
 
-      {editingRecord?.module === "tools" ? (
+      {editingRecord?.module === "manuals" ? (
+        <ManualForm
+          record={editingRecord}
+          machines={machines}
+          busy={recordsLoading}
+          close={() => setEditingRecord(null)}
+          submit={async (record, attachment, onUploadProgress) => {
+            try {
+              await saveRecord({
+                record,
+                attachment,
+                onUploadProgress,
+              });
+              setEditingRecord(null);
+              showSuccess(
+                `Documento “${record.title}” salvato correttamente.`
+              );
+            } catch {
+              // L’errore viene già mostrato da useRecords.
+            }
+          }}
+        />
+      ) : editingRecord?.module === "tools" ? (
         <ToolForm
           record={editingRecord}
           machines={machines}

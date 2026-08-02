@@ -21,6 +21,12 @@ import {
   totalOperationMinutes,
 } from "../lib/jobSheets.ts";
 import type { RecordItem } from "../types/index.ts";
+import {
+  inferManualCategory,
+  isManualReviewOverdue,
+  manualCompleteness,
+  normalizeManualDetails,
+} from "../lib/manuals.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -160,6 +166,54 @@ test("le vecchie lavorazioni guidate vengono convertite nella nuova scheda", () 
   assert.equal(migrated.quantity, "5");
   assert.equal(migrated.operations[0]?.toolId, "tool-a");
   assert.equal(migrated.accountedToolMinutes["tool-a"], 12);
+});
+
+test("i manuali precedenti vengono classificati e migrati nei metadati professionali", () => {
+  const manual: RecordItem = {
+    id: "manual-1",
+    module: "manuals",
+    title: "Manuale manutenzione mandrino CNC",
+    subtitle: "Rev. B",
+    status: "Disponibile",
+    machineId: "machine-1",
+    machine: "Centro di lavoro",
+    notes: "Codice documento: MAN-001\nCostruttore: DMG MORI\nProssima revisione: 2000-01-01\nLingua: Italiano\nTag: mandrino, lubrificazione",
+    createdAt: "2026-08-02T10:00:00.000Z",
+    updatedAt: "2026-08-02T10:00:00.000Z",
+    fileName: "manuale.pdf",
+    fileUrl: "https://example.test/manuale.pdf",
+  };
+  const details = normalizeManualDetails(manual);
+  assert.equal(inferManualCategory(manual), "maintenance");
+  assert.equal(details.documentCode, "MAN-001");
+  assert.equal(details.manufacturer, "DMG MORI");
+  assert.equal(details.revision, "B");
+  assert.deepEqual(details.tags, ["mandrino", "lubrificazione"]);
+  assert.equal(isManualReviewOverdue(manual), true);
+  assert.ok(manualCompleteness(manual) >= 80);
+});
+
+test("la classificazione documentale riconosce sicurezza e qualità", () => {
+  const base: RecordItem = {
+    id: "manual-base",
+    module: "manuals",
+    title: "",
+    subtitle: "",
+    status: "Disponibile",
+    machineId: "",
+    machine: "",
+    notes: "",
+    createdAt: "2026-08-02T10:00:00.000Z",
+    updatedAt: "2026-08-02T10:00:00.000Z",
+  };
+  assert.equal(
+    inferManualCategory({ ...base, title: "Procedura sicurezza DPI" }),
+    "safety"
+  );
+  assert.equal(
+    inferManualCategory({ ...base, title: "Controllo qualità e collaudo" }),
+    "quality"
+  );
 });
 
 test("le regole Storage autorizzano eliminazione e limitano gli upload", async () => {

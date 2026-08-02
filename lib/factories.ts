@@ -1,5 +1,6 @@
 import { recordModuleConfigs } from "@/lib/moduleConfigs";
 import { createEmptyToolDetails } from "@/lib/tools";
+import { createEmptyManualDetails } from "@/lib/manuals";
 import {
   Machine,
   MaintenanceRecord,
@@ -79,6 +80,10 @@ export function createEmptyRecord(
 
   if (moduleId === "tools") {
     record.tool = createEmptyToolDetails();
+  }
+
+  if (moduleId === "manuals") {
+    record.manual = createEmptyManualDetails();
   }
 
   return record;

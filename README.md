@@ -3,14 +3,25 @@
 Applicazione professionale per organizzare dati, documentazione e attività di
 un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-Versione corrente: **2.9.0**.
+Versione corrente: **2.10.0**.
 
 ## Moduli disponibili
 
 - Dashboard operativa e responsive.
 - Macchine con schede tecniche, foto e documenti.
 - Manutenzioni preventive, correttive, guasti e ispezioni.
-- Manuali con allegati.
+- Centro documentale tecnico professionale con:
+  - manuali macchina, cataloghi, procedure, disegni, manutenzione, qualità e sicurezza;
+  - codice documento, costruttore, revisione, emissione e prossima verifica;
+  - lingua, responsabile, riservatezza e tag ricercabili;
+  - documenti TOP e collezioni intelligenti;
+  - centro revisioni con avvisi per documenti scaduti o prossimi alla scadenza;
+  - controllo dei metadati incompleti e degli allegati mancanti;
+  - ricerca per titolo, codice, costruttore, macchina, tag e descrizione;
+  - anteprima interna di PDF, immagini e video;
+  - vista griglia o elenco, filtri per macchina, stato e formato;
+  - conteggio delle consultazioni e documenti aperti di recente;
+  - compatibilità automatica con tutti i manuali già caricati.
 - Utensili professionali con:
   - codice, categoria, produttore e specifiche geometriche;
   - materiale, rivestimento, attacco e macchina collegata;
