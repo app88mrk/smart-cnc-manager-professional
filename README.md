@@ -128,10 +128,14 @@ quando la connessione ritorna.
 ## Verifica
 
 ```bash
+npm run test
 npm run build
 ```
 
-La build controlla compilazione Next.js e validità TypeScript.
+I test controllano formule CNC, limiti numerici, isolamento delle regole
+Firebase e comportamento sicuro del service worker. La build controlla
+compilazione Next.js e validità TypeScript. Per eseguire tutto insieme usa
+`npm run check`.
 
 Il calcolatore usa valori iniziali del costruttore. Prima della produzione è
 necessario verificare serraggio, sporgenza, refrigerazione, stabilità, potenza e

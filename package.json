@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --no-warnings --test tests/professional.test.ts",
+    "check": "npm run test && npm run build"
   },
   "dependencies": {
     "firebase": "^12.2.1",
