@@ -11,6 +11,7 @@ import ConfirmDialog from "@/components/common/ConfirmDialog";
 import FeedbackBanner from "@/components/common/FeedbackBanner";
 import CuttingParametersPage from "@/components/cutting/CuttingParametersPage";
 import Dashboard from "@/components/dashboard/Dashboard";
+import ManualsPage from "@/components/manuals/ManualsPage";
 import MachineDetail from "@/components/machines/MachineDetail";
 import MachineForm from "@/components/machines/MachineForm";
 import MachinesPage from "@/components/machines/MachinesPage";
@@ -306,6 +307,34 @@ export default function AppShell() {
     }
   }
 
+  async function toggleManualTop(record: RecordItem) {
+    const nextTop = !/^s[iì]$/i.test(
+      recordNoteValue(record.notes, "Manuale TOP")
+    );
+
+    try {
+      await saveRecord({
+        record: {
+          ...record,
+          notes: replaceRecordNote(
+            record.notes,
+            "Manuale TOP",
+            nextTop ? "Sì" : "No"
+          ),
+          updatedAt: new Date().toISOString(),
+        },
+        attachment: null,
+      });
+      showSuccess(
+        nextTop
+          ? `“${record.title}” aggiunto alla sezione TOP.`
+          : `“${record.title}” rimosso dalla sezione TOP.`
+      );
+    } catch {
+      // L'errore viene già mostrato da useRecords.
+    }
+  }
+
   if (!authReady) {
     return (
       <div className="centerMessage">Connessione a Firebase…</div>
@@ -473,6 +502,23 @@ export default function AppShell() {
               })
             }
             loading={maintenanceLoading}
+          />
+        ) : active === "manuals" ? (
+          <ManualsPage
+            records={visibleRecords}
+            machines={machines}
+            loading={recordsLoading}
+            openNew={() =>
+              setEditingRecord(createEmptyRecord("manuals"))
+            }
+            openEdit={setEditingRecord}
+            onDelete={(record) =>
+              setPendingDelete({
+                kind: "record",
+                item: record,
+              })
+            }
+            onToggleTop={toggleManualTop}
           />
         ) : active === "tools" ? (
           <ToolsPage
@@ -723,4 +769,21 @@ function quickCreateLabelFor(moduleId: ModuleId) {
     return "Nuova scheda";
   }
   return "";
+}
+
+function recordNoteValue(notes: string, label: string) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return notes.match(new RegExp(`(?:^|\\n)${escaped}:\\s*(.*)$`, "im"))?.[1]?.trim() || "";
+}
+
+function replaceRecordNote(notes: string, label: string, value: string) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(^|\\n)${escaped}:\\s*.*(?=\\n|$)`, "i");
+  const line = `${label}: ${value}`;
+
+  if (pattern.test(notes)) {
+    return notes.replace(pattern, (match, prefix: string) => `${prefix}${line}`);
+  }
+
+  return [notes.trim(), line].filter(Boolean).join("\n");
 }
