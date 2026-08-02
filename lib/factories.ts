@@ -50,6 +50,9 @@ export function createEmptyMaintenance(
     hours: "",
     cost: "",
     parts: "",
+    priority: "Media",
+    recurrence: "Nessuna",
+    checklist: [],
     createdAt: timestamp,
     updatedAt: timestamp,
   };

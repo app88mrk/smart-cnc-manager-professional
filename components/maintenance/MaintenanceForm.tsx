@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { CheckSquare2, Plus, Trash2, X } from "lucide-react";
 import Field from "@/components/common/Field";
 import { Machine, MaintenanceRecord } from "@/types";
 
@@ -20,7 +20,13 @@ export default function MaintenanceForm({
   close,
   submit,
 }: MaintenanceFormProps) {
-  const [form, setForm] = useState(record);
+  const [form, setForm] = useState({
+    ...record,
+    priority: record.priority || "Media" as const,
+    recurrence: record.recurrence || "Nessuna" as const,
+    checklist: record.checklist || [],
+  });
+  const [checklistItem, setChecklistItem] = useState("");
   const [validationError, setValidationError] = useState("");
 
   const set = (key: keyof MaintenanceRecord, value: string) => {
@@ -77,6 +83,19 @@ export default function MaintenanceForm({
     });
   };
 
+  const addChecklistItem = () => {
+    const label = checklistItem.trim();
+    if (!label) return;
+    setForm((current) => ({
+      ...current,
+      checklist: [
+        ...(current.checklist || []),
+        { id: crypto.randomUUID(), label, done: false },
+      ],
+    }));
+    setChecklistItem("");
+  };
+
   return (
     <div className="modal">
       <form onSubmit={(event) => {
@@ -125,6 +144,28 @@ export default function MaintenanceForm({
             </select>
           </label>
 
+          <label>
+            <span>Priorità</span>
+            <select value={form.priority} onChange={(event) => set("priority", event.target.value)}>
+              <option>Bassa</option>
+              <option>Media</option>
+              <option>Alta</option>
+              <option>Critica</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Ripetizione automatica</span>
+            <select value={form.recurrence} onChange={(event) => set("recurrence", event.target.value)}>
+              <option>Nessuna</option>
+              <option>Settimanale</option>
+              <option>Mensile</option>
+              <option>Trimestrale</option>
+              <option>Semestrale</option>
+              <option>Annuale</option>
+            </select>
+          </label>
+
           <Field label="Data pianificata" value={form.scheduledDate} set={(value) => set("scheduledDate", value)} type="date" required />
           <Field label="Data completamento" value={form.completedDate} set={(value) => set("completedDate", value)} type="date" />
           <Field label="Tecnico" value={form.technician} set={(value) => set("technician", value)} />
@@ -136,6 +177,68 @@ export default function MaintenanceForm({
             <span>Descrizione e note</span>
             <textarea value={form.description} onChange={(event) => set("description", event.target.value)} />
           </label>
+
+          <div className="maintenanceChecklistEditor full">
+            <div className="maintenanceChecklistTitle">
+              <span><CheckSquare2 size={16} /> Checklist operativa</span>
+              <small>{form.checklist?.length || 0} controlli</small>
+            </div>
+            <div className="maintenanceChecklistAdd">
+              <input
+                value={checklistItem}
+                onChange={(event) => setChecklistItem(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addChecklistItem();
+                  }
+                }}
+                placeholder="Es. Controllare livello olio mandrino"
+              />
+              <button type="button" onClick={addChecklistItem}>
+                <Plus size={16} /> Aggiungi
+              </button>
+            </div>
+            {form.checklist?.length ? (
+              <div className="maintenanceChecklistRows">
+                {form.checklist.map((item) => (
+                  <label key={item.id}>
+                    <input
+                      type="checkbox"
+                      checked={item.done}
+                      onChange={() =>
+                        setForm((current) => ({
+                          ...current,
+                          checklist: current.checklist?.map((currentItem) =>
+                            currentItem.id === item.id
+                              ? { ...currentItem, done: !currentItem.done }
+                              : currentItem
+                          ),
+                        }))
+                      }
+                    />
+                    <span>{item.label}</span>
+                    <button
+                      type="button"
+                      title="Elimina controllo"
+                      onClick={() =>
+                        setForm((current) => ({
+                          ...current,
+                          checklist: current.checklist?.filter(
+                            (currentItem) => currentItem.id !== item.id
+                          ),
+                        }))
+                      }
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p>Nessun controllo inserito. Crea la sequenza da seguire durante l’intervento.</p>
+            )}
+          </div>
         </div>
 
         {validationError && (

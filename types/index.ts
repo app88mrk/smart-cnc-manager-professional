@@ -106,6 +106,13 @@ export interface MachineDocument {
 
 export type MaintenanceType = "Preventiva" | "Correttiva" | "Guasto" | "Ispezione";
 export type MaintenanceStatus = "Pianificata" | "In corso" | "Completata";
+export type MaintenancePriority = "Bassa" | "Media" | "Alta" | "Critica";
+export type MaintenanceRecurrence = "Nessuna" | "Settimanale" | "Mensile" | "Trimestrale" | "Semestrale" | "Annuale";
+export interface MaintenanceChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+}
 export interface MaintenanceRecord {
   id: string;
   machineId: string;
@@ -119,6 +126,11 @@ export interface MaintenanceRecord {
   hours: string;
   cost: string;
   parts: string;
+  priority?: MaintenancePriority;
+  recurrence?: MaintenanceRecurrence;
+  checklist?: MaintenanceChecklistItem[];
+  nextMaintenanceId?: string;
+  recurrenceSourceId?: string;
   createdAt: string;
   updatedAt: string;
 }

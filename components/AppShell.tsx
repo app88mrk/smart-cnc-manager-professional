@@ -9,6 +9,7 @@ import CommandPalette from "@/components/common/CommandPalette";
 import ComingSoon from "@/components/common/ComingSoon";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import FeedbackBanner from "@/components/common/FeedbackBanner";
+import NotificationCenter from "@/components/common/NotificationCenter";
 import CuttingParametersPage from "@/components/cutting/CuttingParametersPage";
 import Dashboard from "@/components/dashboard/Dashboard";
 import JobsPage from "@/components/jobs/JobsPage";
@@ -336,6 +337,27 @@ export default function AppShell() {
     }
   }
 
+  async function toggleMaintenanceChecklist(
+    record: MaintenanceRecord,
+    itemId: string
+  ) {
+    try {
+      await saveMaintenance({
+        ...record,
+        checklist: (record.checklist || []).map((item) =>
+          item.id === itemId ? { ...item, done: !item.done } : item
+        ),
+      });
+    } catch {
+      // L’errore viene già mostrato da useMaintenance.
+    }
+  }
+
+  function openMaintenanceNotification(record: MaintenanceRecord) {
+    openModule("maintenance");
+    setEditingMaintenance(record);
+  }
+
   if (!authReady) {
     return (
       <div className="centerMessage">Connessione a Firebase…</div>
@@ -380,6 +402,14 @@ export default function AppShell() {
           <span>Cerca in tutta l’app…</span>
           <kbd>Ctrl K</kbd>
         </button>
+
+        <NotificationCenter
+          maintenance={maintenance}
+          records={records}
+          machines={machines}
+          openMaintenance={openMaintenanceNotification}
+          openTools={() => openModule("tools")}
+        />
 
         {quickCreateLabel && (
           <button
@@ -502,6 +532,7 @@ export default function AppShell() {
                 item: record,
               })
             }
+            onToggleChecklist={toggleMaintenanceChecklist}
             loading={maintenanceLoading}
           />
         ) : active === "manuals" ? (
@@ -664,10 +695,16 @@ export default function AppShell() {
           close={() => setEditingMaintenance(null)}
           submit={async (record) => {
             try {
-              await saveMaintenance(record);
+              const recurring = buildRecurringMaintenance(record);
+              await saveMaintenance(recurring.current);
+              if (recurring.next) {
+                await saveMaintenance(recurring.next);
+              }
               setEditingMaintenance(null);
               showSuccess(
-                `Intervento “${record.title}” salvato correttamente.`
+                recurring.next
+                  ? `Intervento “${record.title}” completato. Prossima scadenza creata per il ${formatShortDate(recurring.next.scheduledDate)}.`
+                  : `Intervento “${record.title}” salvato correttamente.`
               );
             } catch {
               // L'errore viene già mostrato da useMaintenance.
@@ -803,4 +840,69 @@ function replaceRecordNote(notes: string, label: string, value: string) {
   }
 
   return [notes.trim(), line].filter(Boolean).join("\n");
+}
+
+function buildRecurringMaintenance(record: MaintenanceRecord): {
+  current: MaintenanceRecord;
+  next: MaintenanceRecord | null;
+} {
+  if (
+    record.status !== "Completata" ||
+    !record.recurrence ||
+    record.recurrence === "Nessuna" ||
+    record.nextMaintenanceId
+  ) {
+    return { current: record, next: null };
+  }
+
+  const nextId = crypto.randomUUID();
+  const timestamp = new Date().toISOString();
+  const nextDate = recurrenceDate(
+    record.scheduledDate,
+    record.recurrence
+  );
+
+  return {
+    current: { ...record, nextMaintenanceId: nextId },
+    next: {
+      ...record,
+      id: nextId,
+      status: "Pianificata",
+      scheduledDate: nextDate,
+      completedDate: "",
+      hours: "",
+      cost: "",
+      parts: "",
+      checklist: (record.checklist || []).map((item) => ({
+        ...item,
+        id: crypto.randomUUID(),
+        done: false,
+      })),
+      nextMaintenanceId: undefined,
+      recurrenceSourceId: record.id,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+  };
+}
+
+function recurrenceDate(
+  dateValue: string,
+  recurrence: NonNullable<MaintenanceRecord["recurrence"]>
+) {
+  const date = new Date(`${dateValue}T12:00:00`);
+  if (recurrence === "Settimanale") date.setDate(date.getDate() + 7);
+  if (recurrence === "Mensile") date.setMonth(date.getMonth() + 1);
+  if (recurrence === "Trimestrale") date.setMonth(date.getMonth() + 3);
+  if (recurrence === "Semestrale") date.setMonth(date.getMonth() + 6);
+  if (recurrence === "Annuale") date.setFullYear(date.getFullYear() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(`${value}T12:00:00`));
 }
