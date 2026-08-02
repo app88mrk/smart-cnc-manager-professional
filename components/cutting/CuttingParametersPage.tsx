@@ -23,6 +23,7 @@ import ProfessionalCuttingPanel, {
   CuttingStrategy,
   MachineCheck,
 } from "@/components/cutting/ProfessionalCuttingPanel";
+import SetupAnalysisPanel from "@/components/cutting/SetupAnalysisPanel";
 import {
   calculateFeed,
   calculateFeedForTargetChipThickness,
@@ -102,8 +103,8 @@ const initialValues: CalculatorValues = {
   axialDepth: "0",
   radialWidth: "0",
   length: "0",
-  passes: "0",
-  approachAngle: "0",
+  passes: "1",
+  approachAngle: "90",
   targetChipThickness: "0",
 };
 
@@ -1202,12 +1203,43 @@ export default function CuttingParametersPage({
           </div>
         )}
 
-        {exceedsSpindle && (
-          <div className="cuttingWarning">
-            <AlertTriangle size={18} />
-            Il risultato di {formatNumber(rpm)} giri/min supera il limite rilevato della macchina ({formatNumber(spindleLimit)} giri/min).
-          </div>
-        )}
+        <SetupAnalysisPanel
+          operation={operation}
+          materialGroup={materialGroup}
+          strategy={strategyLabel(strategy)}
+          articleCode={values.articleCode}
+          machineName={
+            selectedMachine
+              ? `${selectedMachine.brand} ${selectedMachine.model}`.trim()
+              : ""
+          }
+          valid={validCalculation}
+          metrics={{
+            rpm,
+            feed,
+            mrr,
+            power,
+            torque: estimatedTorque,
+            machiningTime,
+          }}
+          limits={{
+            spindle: spindleLimit,
+            feed: machineFeedLimit,
+            power: machinePowerLimit,
+            torque: machineTorqueLimit,
+          }}
+          inputs={{
+            diameter: numeric.diameter,
+            teeth: numeric.teeth,
+            cuttingSpeed: numeric.cuttingSpeed,
+            feedValue: activeFeedValue,
+            axialDepth: numeric.axialDepth,
+            radialWidth: numeric.radialWidth,
+            length: numeric.length,
+            passes: numeric.passes,
+          }}
+          onApplyMachineLimits={applyMachineLimits}
+        />
 
         {localError && (
           <div className="cuttingWarning error">
