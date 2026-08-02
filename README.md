@@ -73,7 +73,10 @@ vengono completate con i nuovi campi alla prima modifica.
 - Registrazione pubblica disabilitata.
 - Accesso applicativo limitato all'utente autorizzato.
 - Regole Firestore e Storage limitate allo stesso utente.
-- Limite massimo degli allegati: 100 MB.
+- App Check predisposto tramite reCAPTCHA v3 per bloccare client non autorizzati.
+- Cache Firestore persistente multi-scheda per lavorare anche con connessione instabile.
+- Service worker limitato ai file dell’app: i contenuti Firebase non vengono inseriti nella cache pubblica del browser.
+- Limite massimo degli allegati: 500 MB.
 
 ## Backup e ripristino
 
@@ -108,6 +111,19 @@ Senza configurazione Firebase l'applicazione usa la modalità demo nel browser.
 3. Attiva Storage.
 4. Copia `.env.example` in `.env.local` e inserisci i valori Firebase.
 5. Pubblica `firestore.rules` e `storage.rules`.
+6. Facoltativo ma consigliato: abilita App Check nel progetto Firebase e imposta
+   `NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY` in Vercel. Dopo la verifica, attiva
+   l’enforcement App Check per Firestore e Storage dalla console Firebase.
+
+La cache offline conserva sul dispositivo i dati già sincronizzati: usa l’app
+solo su un profilo browser personale e protetto.
+
+## Installazione come app
+
+In produzione Smart CNC Manager è una PWA installabile. Dal browser scegli
+“Installa Smart CNC” per aggiungerla al desktop o alla schermata Home. La shell
+dell’app resta disponibile senza rete e Firestore sincronizza le modifiche
+quando la connessione ritorna.
 
 ## Verifica
 

@@ -9,10 +9,12 @@ service firebase.storage {
     match /users/{userId}/{allPaths=**} {
       allow read: if isAuthorizedUser()
         && userId == request.auth.uid;
-      allow write: if isAuthorizedUser()
+      allow create, update: if isAuthorizedUser()
         && request.auth.uid == userId
         && request.resource != null
         && request.resource.size <= 500 * 1024 * 1024;
+      allow delete: if isAuthorizedUser()
+        && request.auth.uid == userId;
     }
   }
 }
