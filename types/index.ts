@@ -50,6 +50,57 @@ export interface ToolDetails {
   usedHours: string;
   lastUsedAt: string;
 }
+export interface JobSheetOperation {
+  id: string;
+  sequence: number;
+  name: string;
+  description: string;
+  toolId: string;
+  programId: string;
+  calculationId: string;
+  estimatedMinutes: string;
+  actualMinutes: string;
+  completed: boolean;
+}
+export type JobQualityResult = "Da controllare" | "Conforme" | "Non conforme";
+export interface JobQualityCheck {
+  id: string;
+  characteristic: string;
+  nominal: string;
+  tolerance: string;
+  measured: string;
+  instrument: string;
+  result: JobQualityResult;
+}
+export interface JobSheetDetails {
+  version: 1;
+  orderCode: string;
+  customer: string;
+  drawingCode: string;
+  drawingRevision: string;
+  partName: string;
+  materialId: string;
+  rawMaterial: string;
+  quantity: string;
+  dueDate: string;
+  clamping: string;
+  fixture: string;
+  workOffset: string;
+  setupNotes: string;
+  estimatedSetupMinutes: string;
+  actualSetupMinutes: string;
+  operations: JobSheetOperation[];
+  qualityChecks: JobQualityCheck[];
+  operator: string;
+  producedQuantity: string;
+  scrapQuantity: string;
+  outcome: string;
+  startedAt: string;
+  completedAt: string;
+  finalNotes: string;
+  approved: boolean;
+  accountedToolMinutes: Record<string, number>;
+}
 export interface RecordItem {
   id: string;
   module: RecordModuleId;
@@ -67,6 +118,7 @@ export interface RecordItem {
   fileType?: string;
   fileSize?: number;
   tool?: ToolDetails;
+  jobSheet?: JobSheetDetails;
 }
 
 export interface Machine {

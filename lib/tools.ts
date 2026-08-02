@@ -1,8 +1,8 @@
-import {
+import type {
   RecordItem,
   ToolCategory,
   ToolDetails,
-} from "@/types";
+} from "../types/index.ts";
 
 export const toolCategories: ToolCategory[] = [
   "Fresa",

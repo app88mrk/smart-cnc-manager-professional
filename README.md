@@ -3,7 +3,7 @@
 Applicazione professionale per organizzare dati, documentazione e attività di
 un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-Versione corrente: **2.8.0**.
+Versione corrente: **2.9.0**.
 
 ## Moduli disponibili
 
@@ -55,7 +55,17 @@ Versione corrente: **2.8.0**.
   - assenza di valori preimpostati finché non viene scelta una scheda;
   - pagina sorgente e anteprima del testo sempre visibili;
   - salvataggio locale persistente nel browser tramite IndexedDB.
-- Lavorazioni.
+- Schede di lavorazione CNC professionali con:
+  - commessa, cliente, disegno, revisione, pezzo, materiale e grezzo;
+  - macchina, serraggio, attrezzatura, origine pezzo e istruzioni di setup;
+  - ciclo operativo composto da più operazioni numerate;
+  - collegamento di utensile, programma CNC e calcolo parametri a ogni fase;
+  - confronto tra tempi previsti ed effettivi;
+  - consumo automatico della vita dei diversi utensili alla chiusura;
+  - quote nominali, tolleranze, misure, strumenti ed esito qualità;
+  - quantità prodotte, scarti, operatore, approvazione e note finali;
+  - riepilogo professionale stampabile o salvabile in PDF;
+  - conversione automatica delle precedenti lavorazioni guidate.
 - Storico allarmi.
 - Knowledge Base.
 - Programmi CNC con allegati.

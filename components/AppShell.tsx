@@ -602,7 +602,6 @@ export default function AppShell() {
             machines={machines}
             loading={recordsLoading}
             onSave={saveRecords}
-            openLegacyEdit={setEditingRecord}
             onDelete={(record) =>
               setPendingDelete({
                 kind: "record",
