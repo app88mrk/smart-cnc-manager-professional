@@ -11,6 +11,7 @@ import ConfirmDialog from "@/components/common/ConfirmDialog";
 import FeedbackBanner from "@/components/common/FeedbackBanner";
 import CuttingParametersPage from "@/components/cutting/CuttingParametersPage";
 import Dashboard from "@/components/dashboard/Dashboard";
+import JobsPage from "@/components/jobs/JobsPage";
 import ManualsPage from "@/components/manuals/ManualsPage";
 import MachineDetail from "@/components/machines/MachineDetail";
 import MachineForm from "@/components/machines/MachineForm";
@@ -562,6 +563,22 @@ export default function AppShell() {
               });
             }}
             saveImportedParameters={saveRecords}
+          />
+        ) : active === "jobs" ? (
+          <JobsPage
+            records={visibleRecords}
+            allRecords={records}
+            machines={machines}
+            loading={recordsLoading}
+            onSave={saveRecords}
+            openLegacyEdit={setEditingRecord}
+            onDelete={(record) =>
+              setPendingDelete({
+                kind: "record",
+                item: record,
+              })
+            }
+            notifySuccess={showSuccess}
           />
         ) : isRecordModuleId(active) ? (
           <RecordsPage
