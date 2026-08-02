@@ -27,6 +27,12 @@ import {
   manualCompleteness,
   normalizeManualDetails,
 } from "../lib/manuals.ts";
+import {
+  analyzeProgramText,
+  buildRestoredProgramRecord,
+  nextProgramVersion,
+  normalizeProgramDetails,
+} from "../lib/programs.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -213,6 +219,93 @@ test("la classificazione documentale riconosce sicurezza e qualità", () => {
   assert.equal(
     inferManualCategory({ ...base, title: "Controllo qualità e collaudo" }),
     "quality"
+  );
+});
+
+test("l’analisi del programma CNC rileva codice, righe, utensili e origini", () => {
+  const analysis = analyzeProgramText(
+    "%\nO1042 (STAFFA OP10)\nG54 G90\nT0101 M06\nG0 X0 Y0\nT0808\nG55.1\nM30"
+  );
+  assert.equal(analysis.programCode, "O1042");
+  assert.equal(analysis.lineCount, 8);
+  assert.deepEqual(analysis.toolNumbers, ["T101", "T808"]);
+  assert.deepEqual(analysis.workOffsets, ["G54", "G55.1"]);
+});
+
+test("le versioni CNC avanzano in modo deterministico", () => {
+  assert.equal(nextProgramVersion("1.0.0"), "1.0.1");
+  assert.equal(nextProgramVersion("2.7.9"), "2.7.10");
+  assert.equal(nextProgramVersion("non valida"), "1.0.0");
+});
+
+test("il ripristino conserva la release corrente e richiede nuova validazione", () => {
+  const timestamp = "2026-08-02T10:00:00.000Z";
+  const program: RecordItem = {
+    id: "program-1",
+    module: "programs",
+    title: "Staffa OP10",
+    subtitle: "O1042 · V2.0.0",
+    status: "In produzione",
+    machineId: "machine-1",
+    machine: "Centro di lavoro",
+    notes: "[PROGRAMMA_CNC_PRO_V1]",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    fileName: "O1042-v2.nc",
+    fileUrl: "https://example.test/v2.nc",
+    filePath: "programs/v2.nc",
+    fileType: "text/plain",
+    fileSize: 200,
+    program: {
+      ...normalizeProgramDetails({
+        id: "empty",
+        module: "programs",
+        title: "",
+        subtitle: "",
+        status: "Bozza",
+        machineId: "",
+        machine: "",
+        notes: "",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+      programCode: "O1042",
+      currentVersion: "2.0.0",
+      checksum: "current-checksum",
+      approved: true,
+      approvedBy: "Responsabile",
+      revisions: [
+        {
+          id: "revision-1",
+          version: "1.0.0",
+          createdAt: timestamp,
+          changeNote: "Prima versione",
+          status: "Validato",
+          checksum: "old-checksum",
+          lineCount: 10,
+          toolNumbers: ["T1"],
+          workOffsets: ["G54"],
+          fileName: "O1042-v1.nc",
+          fileUrl: "https://example.test/v1.nc",
+          filePath: "programs/v1.nc",
+          fileType: "text/plain",
+          fileSize: 100,
+        },
+      ],
+    },
+  };
+  const restored = buildRestoredProgramRecord(
+    program,
+    program.program!.revisions[0]
+  );
+  assert.equal(restored.status, "Bozza");
+  assert.equal(restored.filePath, "programs/v1.nc");
+  assert.equal(restored.program?.currentVersion, "1.0.0");
+  assert.equal(restored.program?.approved, false);
+  assert.ok(
+    restored.program?.revisions.some(
+      (revision) => revision.filePath === "programs/v2.nc"
+    )
   );
 });
 

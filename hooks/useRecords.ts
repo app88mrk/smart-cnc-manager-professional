@@ -23,6 +23,7 @@ type SaveRecordInput = {
   attachment: File | null;
   background?: boolean;
   onUploadProgress?: (percent: number) => void;
+  preservePreviousFile?: boolean;
 };
 
 export default function useRecords({
@@ -62,6 +63,7 @@ export default function useRecords({
       attachment,
       background = false,
       onUploadProgress,
+      preservePreviousFile = false,
     }: SaveRecordInput) => {
       if (!background) setRecordsLoading(true);
 
@@ -73,7 +75,8 @@ export default function useRecords({
             updatedAt: new Date().toISOString(),
           },
           attachment,
-          onUploadProgress
+          onUploadProgress,
+          preservePreviousFile
         );
         setRecords(await listRecords(uid));
       } catch (error) {

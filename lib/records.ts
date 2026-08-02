@@ -60,7 +60,8 @@ export async function saveRecord(
   uid: string,
   record: RecordItem,
   attachment?: File | null,
-  onUploadProgress?: (percent: number) => void
+  onUploadProgress?: (percent: number) => void,
+  preservePreviousFile = false
 ): Promise<RecordItem> {
   let saved = { ...record };
 
@@ -79,7 +80,7 @@ export async function saveRecord(
       throw new Error("Il file supera il limite di 500 MB.");
     }
 
-    if (saved.filePath) {
+    if (saved.filePath && !preservePreviousFile) {
       try {
         await deleteObject(ref(storage, saved.filePath));
       } catch {
@@ -201,12 +202,16 @@ export async function removeRecord(
   uid: string,
   record: RecordItem
 ): Promise<void> {
-  if (storage && record.filePath) {
-    try {
-      await deleteObject(ref(storage, record.filePath));
-    } catch {
-      // Il file potrebbe essere già stato rimosso.
-    }
+  if (storage) {
+    await Promise.all(
+      recordStoragePaths(record).map(async (filePath) => {
+        try {
+          await deleteObject(ref(storage!, filePath));
+        } catch {
+          // Il file potrebbe essere già stato rimosso.
+        }
+      })
+    );
   }
 
   if (db) {
@@ -229,11 +234,11 @@ export async function removeRecords(
 
   if (storage) {
     await Promise.all(
-      records
-        .filter((record) => record.filePath)
-        .map(async (record) => {
+      Array.from(
+        new Set(records.flatMap(recordStoragePaths))
+      ).map(async (filePath) => {
           try {
-            await deleteObject(ref(storage!, record.filePath!));
+            await deleteObject(ref(storage!, filePath));
           } catch {
             // Il file potrebbe essere già stato rimosso.
           }
@@ -295,4 +300,17 @@ function chunkRecords(records: RecordItem[], size: number) {
   }
 
   return chunks;
+}
+
+function recordStoragePaths(record: RecordItem) {
+  return Array.from(
+    new Set(
+      [
+        record.filePath,
+        ...(record.program?.revisions.map(
+          (revision) => revision.filePath
+        ) || []),
+      ].filter((value): value is string => Boolean(value))
+    )
+  );
 }

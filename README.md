@@ -3,7 +3,7 @@
 Applicazione professionale per organizzare dati, documentazione e attività di
 un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-Versione corrente: **2.10.0**.
+Versione corrente: **2.11.0**.
 
 ## Moduli disponibili
 
@@ -79,7 +79,20 @@ Versione corrente: **2.10.0**.
   - conversione automatica delle precedenti lavorazioni guidate.
 - Storico allarmi.
 - Knowledge Base.
-- Programmi CNC con allegati.
+- Archivio programmi CNC professionale con:
+  - file collegato obbligatoriamente alla macchina di destinazione;
+  - codice programma, particolare, disegno, revisione e controllo CNC;
+  - versioni semantiche, motivo della modifica e stato operativo;
+  - validazione nominativa prima dell’uso in produzione;
+  - checksum SHA-256 per verificare l’integrità del file;
+  - analisi automatica di righe, utensili e origini G54–G59;
+  - ricerca e filtri per macchina, stato e completezza;
+  - anteprima interna del codice CNC con numerazione delle righe;
+  - conservazione automatica dei file sostituiti in Firebase Storage;
+  - timeline delle revisioni con download, confronto e ripristino;
+  - ritorno automatico in Bozza dopo il ripristino di una release;
+  - collegamenti alle schede di lavorazione che usano il programma;
+  - compatibilità con i programmi creati nelle versioni precedenti.
 - Materiali.
 
 Ogni scheda dei moduli professionali può essere collegata a una macchina,

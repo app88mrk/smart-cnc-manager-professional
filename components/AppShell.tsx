@@ -20,6 +20,8 @@ import MachineForm from "@/components/machines/MachineForm";
 import MachinesPage from "@/components/machines/MachinesPage";
 import MaintenanceForm from "@/components/maintenance/MaintenanceForm";
 import MaintenancePage from "@/components/maintenance/MaintenancePage";
+import ProgramForm from "@/components/programs/ProgramForm";
+import ProgramsPage from "@/components/programs/ProgramsPage";
 import RecordForm from "@/components/records/RecordForm";
 import RecordsPage from "@/components/records/RecordsPage";
 import ToolForm from "@/components/tools/ToolForm";
@@ -41,6 +43,9 @@ import { firebaseConfigured } from "@/lib/firebase";
 import { isRecordModuleId } from "@/lib/moduleConfigs";
 import { modules } from "@/lib/modules";
 import { normalizeManualDetails } from "@/lib/manuals";
+import {
+  buildRestoredProgramRecord,
+} from "@/lib/programs";
 import {
   Machine,
   MaintenanceRecord,
@@ -359,6 +364,24 @@ export default function AppShell() {
     }
   }
 
+  async function restoreProgramRevision(
+    record: RecordItem,
+    revision: NonNullable<RecordItem["program"]>["revisions"][number]
+  ) {
+    try {
+      const restored = buildRestoredProgramRecord(record, revision);
+      await saveRecord({
+        record: restored,
+        attachment: null,
+      });
+      showSuccess(
+        `Versione ${revision.version} di “${record.title}” ripristinata. Il programma è tornato in Bozza per una nuova validazione.`
+      );
+    } catch {
+      // L’errore viene già mostrato da useRecords.
+    }
+  }
+
   async function toggleMaintenanceChecklist(
     record: MaintenanceRecord,
     itemId: string
@@ -575,6 +598,24 @@ export default function AppShell() {
             onToggleTop={toggleManualTop}
             onDocumentOpen={trackManualOpen}
           />
+        ) : active === "programs" ? (
+          <ProgramsPage
+            records={visibleRecords}
+            allRecords={records}
+            machines={machines}
+            loading={recordsLoading}
+            openNew={() =>
+              setEditingRecord(createEmptyRecord("programs"))
+            }
+            openEdit={setEditingRecord}
+            onDelete={(record) =>
+              setPendingDelete({
+                kind: "record",
+                item: record,
+              })
+            }
+            onRestoreRevision={restoreProgramRevision}
+          />
         ) : active === "tools" ? (
           <ToolsPage
             records={visibleRecords}
@@ -757,6 +798,34 @@ export default function AppShell() {
             }
           }}
         />
+      ) : editingRecord?.module === "programs" ? (
+        <ProgramForm
+          record={editingRecord}
+          machines={machines}
+          busy={recordsLoading}
+          close={() => setEditingRecord(null)}
+          submit={async (
+            record,
+            attachment,
+            preservePreviousFile,
+            onUploadProgress
+          ) => {
+            try {
+              await saveRecord({
+                record,
+                attachment,
+                preservePreviousFile,
+                onUploadProgress,
+              });
+              setEditingRecord(null);
+              showSuccess(
+                `Programma “${record.title}” salvato con controllo versione.`
+              );
+            } catch {
+              // L’errore viene già mostrato da useRecords.
+            }
+          }}
+        />
       ) : editingRecord?.module === "tools" ? (
         <ToolForm
           record={editingRecord}
@@ -807,6 +876,8 @@ export default function AppShell() {
                 ? "Eliminare l’intervento?"
                 : pendingDelete.item.module === "tools"
                   ? "Eliminare l’utensile?"
+                  : pendingDelete.item.module === "programs"
+                    ? "Eliminare l’archivio programma?"
                   : "Eliminare la scheda?"
           }
           message={
@@ -816,6 +887,8 @@ export default function AppShell() {
                 ? `L’intervento “${pendingDelete.item.title}” verrà eliminato definitivamente.`
                 : pendingDelete.item.module === "tools"
                   ? `L’utensile “${pendingDelete.item.title}” verrà eliminato definitivamente.`
+                  : pendingDelete.item.module === "programs"
+                    ? `Il programma “${pendingDelete.item.title}”, il file corrente e tutte le revisioni conservate verranno eliminati definitivamente.`
                   : `La scheda “${pendingDelete.item.title}” e il relativo allegato verranno eliminati definitivamente.`
           }
           busy={
@@ -863,6 +936,7 @@ function quickCreateLabelFor(moduleId: ModuleId) {
   if (moduleId === "machines") return "Nuova macchina";
   if (moduleId === "maintenance") return "Nuovo intervento";
   if (moduleId === "tools") return "Nuovo utensile";
+  if (moduleId === "programs") return "Nuovo programma";
   if (moduleId !== "dashboard" && moduleId !== "cutting" && isRecordModuleId(moduleId)) {
     return "Nuova scheda";
   }

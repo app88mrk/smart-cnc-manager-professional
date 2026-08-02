@@ -126,6 +126,40 @@ export interface ManualDetails {
   openCount: number;
   lastOpenedAt: string;
 }
+export interface ProgramRevision {
+  id: string;
+  version: string;
+  createdAt: string;
+  changeNote: string;
+  status: string;
+  checksum: string;
+  lineCount: number;
+  toolNumbers: string[];
+  workOffsets: string[];
+  fileName: string;
+  fileUrl: string;
+  filePath: string;
+  fileType: string;
+  fileSize: number;
+}
+export interface ProgramDetails {
+  version: 1;
+  programCode: string;
+  partName: string;
+  drawingCode: string;
+  drawingRevision: string;
+  controller: string;
+  currentVersion: string;
+  checksum: string;
+  lineCount: number;
+  toolNumbers: string[];
+  workOffsets: string[];
+  lastValidatedAt: string;
+  approvedBy: string;
+  approved: boolean;
+  changeNote: string;
+  revisions: ProgramRevision[];
+}
 export interface RecordItem {
   id: string;
   module: RecordModuleId;
@@ -145,6 +179,7 @@ export interface RecordItem {
   tool?: ToolDetails;
   jobSheet?: JobSheetDetails;
   manual?: ManualDetails;
+  program?: ProgramDetails;
 }
 
 export interface Machine {
