@@ -146,6 +146,34 @@ export default function CatalogImporter({
     );
   }
 
+  function updateRow(
+    id: string,
+    patch: Partial<CatalogCandidate>
+  ) {
+    setRows((current) => {
+      const selectedById = new Map(
+        current.map((row) => [row.id, row.selected])
+      );
+      const changed = current.map((row) =>
+        row.id === id ? { ...row, ...patch } : row
+      );
+      const validated = validateCatalogCandidates(
+        changed,
+        existingParameters
+      );
+
+      return validated.map((row) => ({
+        ...row,
+        selected:
+          row.id === id
+            ? row.valid && !row.duplicate
+            : Boolean(selectedById.get(row.id)) &&
+              row.valid &&
+              !row.duplicate,
+      }));
+    });
+  }
+
   async function archiveCatalog(
     catalogId = createId("catalog")
   ) {
@@ -394,6 +422,14 @@ export default function CatalogImporter({
             )}
           </div>
 
+          <div className="catalogEditNotice">
+            <CheckCircle2 size={16} />
+            <span>
+              Controlla e correggi direttamente codice, descrizione, categoria,
+              diametro, taglienti, Vc e avanzamento prima dell’importazione.
+            </span>
+          </div>
+
           <div className="catalogTableWrap">
             <table className="catalogImportTable">
               <thead>
@@ -434,14 +470,83 @@ export default function CatalogImporter({
                     <td>
                       <CatalogStatus row={row} />
                     </td>
-                    <td><b>{row.code}</b></td>
-                    <td>{row.name}</td>
-                    <td>{row.category}</td>
-                    <td>{row.diameter || "—"}</td>
-                    <td>{row.teeth || "—"}</td>
-                    <td>{row.cuttingSpeed || "—"}</td>
-                    <td>{row.feed || "—"}</td>
-                    <td>{row.sourcePage || "—"}</td>
+                    <td>
+                      <input
+                        className="catalogCellInput code"
+                        value={row.code}
+                        onChange={(event) => updateRow(row.id, { code: event.target.value })}
+                        aria-label="Codice articolo"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="catalogCellInput description"
+                        value={row.name}
+                        onChange={(event) => updateRow(row.id, { name: event.target.value })}
+                        aria-label="Descrizione utensile"
+                      />
+                    </td>
+                    <td>
+                      <select
+                        className="catalogCellSelect"
+                        value={row.category}
+                        onChange={(event) => {
+                          const nextCategory = event.target.value as CatalogCandidate["category"];
+                          updateRow(row.id, {
+                            category: nextCategory,
+                            feedKind: nextCategory === "Fresa" ? "fz" : "f",
+                          });
+                        }}
+                        aria-label="Categoria utensile"
+                      >
+                        <option>Fresa</option>
+                        <option>Punta</option>
+                        <option>Maschio</option>
+                        <option>Bareno</option>
+                        <option>Inserto</option>
+                        <option>Tornitura</option>
+                        <option>Portautensile</option>
+                        <option>Altro</option>
+                      </select>
+                    </td>
+                    <td>
+                      <CatalogNumberInput
+                        value={row.diameter}
+                        label="Diametro"
+                        onChange={(diameter) => updateRow(row.id, { diameter })}
+                      />
+                    </td>
+                    <td>
+                      <CatalogNumberInput
+                        value={row.teeth}
+                        label="Taglienti"
+                        integer
+                        onChange={(teeth) => updateRow(row.id, { teeth })}
+                      />
+                    </td>
+                    <td>
+                      <CatalogNumberInput
+                        value={row.cuttingSpeed}
+                        label="Velocità di taglio"
+                        onChange={(cuttingSpeed) => updateRow(row.id, { cuttingSpeed })}
+                      />
+                    </td>
+                    <td>
+                      <CatalogNumberInput
+                        value={row.feed}
+                        label={row.feedKind === "fz" ? "Avanzamento al dente" : "Avanzamento al giro"}
+                        onChange={(feed) => updateRow(row.id, { feed })}
+                      />
+                      <small className="catalogFeedKind">{row.feedKind}</small>
+                    </td>
+                    <td>
+                      <CatalogNumberInput
+                        value={row.sourcePage || 0}
+                        label="Pagina catalogo"
+                        integer
+                        onChange={(sourcePage) => updateRow(row.id, { sourcePage: sourcePage || undefined })}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -543,6 +648,34 @@ function CatalogStatus({ row }: { row: CatalogCandidate }) {
   }
 
   return <span className="catalogRowStatus valid">Valido</span>;
+}
+
+function CatalogNumberInput({
+  value,
+  label,
+  integer = false,
+  onChange,
+}: {
+  value: number;
+  label: string;
+  integer?: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <input
+      className="catalogCellInput number"
+      type="number"
+      inputMode="decimal"
+      min="0"
+      step={integer ? "1" : "any"}
+      value={value || ""}
+      onChange={(event) => {
+        const parsed = Number(event.target.value.replace(",", "."));
+        onChange(Number.isFinite(parsed) ? Math.max(parsed, 0) : 0);
+      }}
+      aria-label={label}
+    />
+  );
 }
 
 function formatBytes(bytes: number) {
