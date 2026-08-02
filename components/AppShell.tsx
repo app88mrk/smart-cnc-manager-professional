@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { LogOut, Menu, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { LogOut, Menu, Plus, Search } from "lucide-react";
 
 import AuthScreen from "@/components/auth/AuthScreen";
 import BackupControls from "@/components/common/BackupControls";
+import CommandPalette from "@/components/common/CommandPalette";
 import ComingSoon from "@/components/common/ComingSoon";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import FeedbackBanner from "@/components/common/FeedbackBanner";
@@ -38,6 +39,7 @@ import { modules } from "@/lib/modules";
 import {
   Machine,
   MaintenanceRecord,
+  ModuleId,
   RecordItem,
 } from "@/types";
 
@@ -69,6 +71,7 @@ export default function AppShell() {
     useState<PendingDelete>(null);
   const [restoreFile, setRestoreFile] =
     useState<File | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const {
     feedback,
@@ -175,6 +178,80 @@ export default function AppShell() {
     [active, queryText, records]
   );
 
+  const moduleCounts = useMemo(() => {
+    const counts: Partial<Record<ModuleId, number>> = {
+      machines: machines.length,
+      maintenance: maintenance.filter(
+        (record) => record.status !== "Completata"
+      ).length,
+    };
+
+    records.forEach((record) => {
+      if (record.notes.includes("[IMPORT_CATALOGO]")) return;
+      if (record.module === "jobs" && isCuttingHistoryRecord(record)) {
+        counts.cutting = (counts.cutting || 0) + 1;
+        return;
+      }
+      counts[record.module] = (counts[record.module] || 0) + 1;
+    });
+
+    return counts;
+  }, [machines.length, maintenance, records]);
+
+  const quickCreateLabel = quickCreateLabelFor(active);
+
+  useEffect(() => {
+    function handleGlobalShortcut(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+      } else if (event.key === "Escape" && searchOpen) {
+        setSearchOpen(false);
+        setQueryText("");
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalShortcut);
+    return () => window.removeEventListener("keydown", handleGlobalShortcut);
+  }, [searchOpen, setQueryText]);
+
+  function closeGlobalSearch() {
+    setSearchOpen(false);
+    setQueryText("");
+  }
+
+  function openMachineFromSearch(machine: Machine) {
+    openModule("machines");
+    setMachineDetail(machine);
+  }
+
+  function openMaintenanceFromSearch(record: MaintenanceRecord) {
+    openModule("maintenance");
+    setEditingMaintenance(record);
+  }
+
+  function openRecordFromSearch(record: RecordItem) {
+    if (record.module === "cutting" || isCuttingHistoryRecord(record)) {
+      openModule("cutting");
+      return;
+    }
+
+    openModule(record.module);
+    setEditingRecord(record);
+  }
+
+  function openQuickCreate() {
+    if (active === "machines") {
+      setEditingMachine(createEmptyMachine());
+    } else if (active === "maintenance") {
+      setEditingMaintenance(createEmptyMaintenance());
+    } else if (active === "tools") {
+      setEditingRecord(createEmptyRecord("tools"));
+    } else if (active !== "dashboard" && active !== "cutting" && isRecordModuleId(active)) {
+      setEditingRecord(createEmptyRecord(active));
+    }
+  }
+
   async function confirmDelete() {
     if (!pendingDelete) {
       return;
@@ -263,14 +340,27 @@ export default function AppShell() {
           </div>
         </div>
 
-        <div className="globalSearch">
+        <button
+          type="button"
+          className="globalSearch globalSearchTrigger"
+          onClick={() => setSearchOpen(true)}
+          aria-label="Cerca in tutta l'applicazione"
+        >
           <Search size={18} />
-          <input
-            value={queryText}
-            onChange={(event) => setQueryText(event.target.value)}
-            placeholder="Cerca nel modulo corrente…"
-          />
-        </div>
+          <span>Cerca in tutta l’app…</span>
+          <kbd>Ctrl K</kbd>
+        </button>
+
+        {quickCreateLabel && (
+          <button
+            type="button"
+            className="headerQuickCreate"
+            onClick={openQuickCreate}
+          >
+            <Plus size={17} />
+            <span>{quickCreateLabel}</span>
+          </button>
+        )}
 
         <div
           className={`cloud ${
@@ -316,6 +406,9 @@ export default function AppShell() {
                     : "Standby"}
                 </em>
               )}
+              {module.state === "active" && Boolean(moduleCounts[module.id]) && (
+                <strong className="navCount">{moduleCounts[module.id]}</strong>
+              )}
             </button>
           ))}
         </nav>
@@ -326,6 +419,15 @@ export default function AppShell() {
           selectBackup={setRestoreFile}
         />
       </aside>
+
+      {mobileOpen && (
+        <button
+          type="button"
+          className="mobileBackdrop"
+          onClick={toggleMobile}
+          aria-label="Chiudi menu"
+        />
+      )}
 
       <main>
         {feedback && (
@@ -436,6 +538,21 @@ export default function AppShell() {
           <ComingSoon active={active} />
         )}
       </main>
+
+      {searchOpen && (
+        <CommandPalette
+          query={queryText}
+          machines={machines}
+          maintenance={maintenance}
+          records={records}
+          setQuery={setQueryText}
+          close={closeGlobalSearch}
+          openModule={openModule}
+          openMachine={openMachineFromSearch}
+          openMaintenance={openMaintenanceFromSearch}
+          openRecord={openRecordFromSearch}
+        />
+      )}
 
       {editingMachine && (
         <MachineForm
@@ -596,4 +713,14 @@ function isCuttingHistoryRecord(record: RecordItem) {
     record.notes.includes("[CALCOLO_PARAMETRI_V5]") ||
     /^(Fresatura|Foratura|Tornitura)\s*·/i.test(record.title)
   );
+}
+
+function quickCreateLabelFor(moduleId: ModuleId) {
+  if (moduleId === "machines") return "Nuova macchina";
+  if (moduleId === "maintenance") return "Nuovo intervento";
+  if (moduleId === "tools") return "Nuovo utensile";
+  if (moduleId !== "dashboard" && moduleId !== "cutting" && isRecordModuleId(moduleId)) {
+    return "Nuova scheda";
+  }
+  return "";
 }
