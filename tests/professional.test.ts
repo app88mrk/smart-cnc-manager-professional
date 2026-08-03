@@ -342,4 +342,6 @@ test("la sezione parametri separa calcolo, cataloghi e storico", async () => {
   assert.match(page, /Parametri catalogo/);
   assert.match(page, /Cataloghi PDF/);
   assert.match(page, /Storico dei calcoli/);
+  assert.match(page, /Parametri avanzati/);
+  assert.match(page, /aria-expanded=\{advancedOpen\}/);
 });

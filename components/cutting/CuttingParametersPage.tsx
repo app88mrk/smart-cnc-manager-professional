@@ -6,6 +6,7 @@ import {
   Archive,
   Calculator,
   CheckCircle2,
+  ChevronDown,
   History,
   Library,
   Pencil,
@@ -1293,6 +1294,13 @@ function BaseOperationFields({
   values: CalculatorValues;
   updateValue: (key: keyof CalculatorValues, value: string) => void;
 }) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const advancedConfigured =
+    parseNumber(values.axialDepth) > 0 ||
+    parseNumber(values.radialWidth) > 0 ||
+    parseNumber(values.length) > 0 ||
+    parseNumber(values.passes) > 1;
+
   return (
     <div className="cuttingPanel">
       <div className="cuttingPanelHead">
@@ -1303,7 +1311,7 @@ function BaseOperationFields({
         <small>Valori modificabili</small>
       </div>
 
-      <div className="cuttingInputGrid">
+      <div className="cuttingInputGrid cuttingInputGridBase">
         <NumberField label="Diametro D" unit="mm" value={values.diameter} onChange={(value) => updateValue("diameter", value)} />
         {operation === "milling" && (
           <NumberField label="Taglienti z" value={values.teeth} onChange={(value) => updateValue("teeth", value)} />
@@ -1314,13 +1322,35 @@ function BaseOperationFields({
         ) : (
           <NumberField label="Avanzamento al giro f" unit="mm/giro" value={values.feedPerRev} onChange={(value) => updateValue("feedPerRev", value)} />
         )}
-        <NumberField label={operation === "turning" ? "Profondità passata ap" : "Profondità assiale ap"} unit="mm" value={values.axialDepth} onChange={(value) => updateValue("axialDepth", value)} />
-        {operation === "milling" && (
-          <NumberField label="Larghezza radiale ae" unit="mm" value={values.radialWidth} onChange={(value) => updateValue("radialWidth", value)} />
-        )}
-        <NumberField label={operation === "drilling" ? "Profondità foro" : "Lunghezza lavorata"} unit="mm" value={values.length} onChange={(value) => updateValue("length", value)} />
-        <NumberField label="Numero passate" value={values.passes} onChange={(value) => updateValue("passes", value)} />
       </div>
+
+      <button
+        type="button"
+        className={`cuttingAdvancedToggle ${advancedOpen ? "active" : ""}`}
+        onClick={() => setAdvancedOpen((current) => !current)}
+        aria-expanded={advancedOpen}
+      >
+        <Settings2 size={16} />
+        <span>
+          <b>Parametri avanzati</b>
+          <small>ap, ae, lunghezza lavorata e numero passate</small>
+        </span>
+        {advancedConfigured && <em>Valori inseriti</em>}
+        <ChevronDown size={16} />
+      </button>
+
+      {advancedOpen && (
+        <div className="cuttingAdvancedBlock">
+          <div className="cuttingInputGrid">
+            <NumberField label={operation === "turning" ? "Profondità passata ap" : "Profondità assiale ap"} unit="mm" value={values.axialDepth} onChange={(value) => updateValue("axialDepth", value)} />
+            {operation === "milling" && (
+              <NumberField label="Larghezza radiale ae" unit="mm" value={values.radialWidth} onChange={(value) => updateValue("radialWidth", value)} />
+            )}
+            <NumberField label={operation === "drilling" ? "Profondità foro" : "Lunghezza lavorata"} unit="mm" value={values.length} onChange={(value) => updateValue("length", value)} />
+            <NumberField label="Numero passate" value={values.passes} onChange={(value) => updateValue("passes", value)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

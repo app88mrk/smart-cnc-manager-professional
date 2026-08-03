@@ -3,6 +3,7 @@ import PwaManager from "@/components/common/PwaManager";
 import "./globals.css";
 import "./programs.css";
 import "./cutting-organized.css";
+import "./cutting-advanced.css";
 
 export const metadata: Metadata = {
   title: "Smart CNC Manager Professional",

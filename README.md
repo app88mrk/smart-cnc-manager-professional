@@ -3,7 +3,7 @@
 Applicazione professionale per organizzare dati, documentazione e attività di
 un reparto CNC. Sviluppata con Next.js, React, TypeScript e Firebase.
 
-Versione corrente: **2.12.0**.
+Versione corrente: **2.12.1**.
 
 ## Moduli disponibili
 
@@ -33,6 +33,7 @@ Versione corrente: **2.12.0**.
   - interfaccia ordinata in quattro aree separate: Calcolo, Parametri catalogo,
     Cataloghi PDF e Storico;
   - calcolo guidato in quattro passaggi: dati, parametri, verifica e salvataggio;
+  - ap, ae, lunghezza lavorata e numero passate raccolti nei parametri avanzati;
   - analisi setup, strategia macchina ed esperienza storica apribili solo quando servono;
   - calcolo di giri mandrino, avanzamento e tempo stimato;
   - modalità foratura, fresatura e tornitura;
