@@ -331,3 +331,15 @@ test("il service worker non intercetta upload o domini Firebase", async () => {
   assert.doesNotMatch(worker, /firebasestorage\.googleapis\.com/);
   assert.doesNotMatch(worker, /googleapis\.com/);
 });
+
+test("la sezione parametri separa calcolo, cataloghi e storico", async () => {
+  const page = await readFile(
+    join(root, "components", "cutting", "CuttingParametersPage.tsx"),
+    "utf8"
+  );
+  assert.match(page, /Dati di partenza/);
+  assert.match(page, /Inserimento parametri e risultati/);
+  assert.match(page, /Parametri catalogo/);
+  assert.match(page, /Cataloghi PDF/);
+  assert.match(page, /Storico dei calcoli/);
+});

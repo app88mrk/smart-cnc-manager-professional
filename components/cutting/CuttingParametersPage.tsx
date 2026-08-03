@@ -3,13 +3,18 @@
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Archive,
   Calculator,
-  Database,
+  CheckCircle2,
+  History,
+  Library,
   Pencil,
   Printer,
   Save,
+  Settings2,
   Star,
   Trash2,
+  UploadCloud,
   X,
 } from "lucide-react";
 
@@ -42,6 +47,8 @@ import {
 import { Machine, RecordItem } from "@/types";
 
 type CalculatorTab = CuttingOperation | "chip" | "power";
+type CuttingSection = "calculator" | "library" | "catalogs" | "history";
+type SupportPanel = "analysis" | "professional" | "experience" | null;
 
 type CatalogBaseValues = {
   cuttingSpeed: number;
@@ -187,7 +194,8 @@ export default function CuttingParametersPage({
   const [editingCalculationId, setEditingCalculationId] =
     useState("");
   const [localError, setLocalError] = useState("");
-  const [catalogManagerOpen, setCatalogManagerOpen] = useState(false);
+  const [section, setSection] = useState<CuttingSection>("calculator");
+  const [supportPanel, setSupportPanel] = useState<SupportPanel>(null);
   const [strategy, setStrategy] =
     useState<CuttingStrategy>("manual");
   const [catalogBase, setCatalogBase] =
@@ -549,6 +557,7 @@ export default function CuttingParametersPage({
       approachAngle: savedNumber(record.notes, "Angolo di attacco"),
       targetChipThickness: savedNumber(record.notes, "hmax desiderato"),
     });
+    setSection("calculator");
     setLocalError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -623,6 +632,7 @@ export default function CuttingParametersPage({
           ? feedPerTooth
           : current.targetChipThickness,
     }));
+    setSection("calculator");
     setLocalError("");
     notifySuccess(
       `Parametri “${record.title}” caricati nel calcolatore.`
@@ -664,6 +674,7 @@ export default function CuttingParametersPage({
     setCatalogBase(null);
     setStrategy("manual");
     setOutcome("Da testare");
+    setSection("calculator");
     setLocalError("");
     notifySuccess("Valori medi della tua esperienza caricati nel calcolatore.");
     window.requestAnimationFrame(() => {
@@ -899,406 +910,206 @@ export default function CuttingParametersPage({
   }
 
   return (
-    <section className="cuttingCalculator">
-      <div className="pageHead cuttingPageHead">
+    <section className="cuttingCalculator cuttingOrganized">
+      <div className="pageHead cuttingPageHead cuttingOrganizedHead">
         <div>
-          <span>CALCOLATORE CNC V5</span>
+          <span>CALCOLATORE CNC PROFESSIONALE</span>
           <h1>Parametri di taglio</h1>
           <p>
-            Seleziona i dati dagli archivi Firebase oppure inseriscili
-            manualmente. Tutti i valori restano modificabili.
+            Un flusso ordinato: scegli i dati, calcola, verifica e salva.
+            Cataloghi e storico restano in aree separate.
           </p>
         </div>
-
         <div className="cuttingHeadIcon" aria-hidden="true">
           <Calculator size={28} />
         </div>
       </div>
 
-      <div className="cuttingSourcePanel">
-        <div className="cuttingSourceTitle">
-          <Database size={18} />
-          <div>
-            <b>Dati di partenza</b>
-            <small>Archivi dell’app o inserimento manuale</small>
-          </div>
-        </div>
+      <nav className="cuttingSectionNav" aria-label="Sezioni parametri di taglio">
+        <button type="button" className={section === "calculator" ? "active" : ""} onClick={() => setSection("calculator")}>
+          <span><Calculator size={19} /></span>
+          <div><b>Calcolo</b><small>Inserimento e risultati</small></div>
+        </button>
+        <button type="button" className={section === "library" ? "active" : ""} onClick={() => setSection("library")}>
+          <span><Library size={19} /></span>
+          <div><b>Parametri catalogo</b><small>Utensili già estratti</small></div>
+          <em>{catalogParameters.length}</em>
+        </button>
+        <button type="button" className={section === "catalogs" ? "active" : ""} onClick={() => setSection("catalogs")}>
+          <span><UploadCloud size={19} /></span>
+          <div><b>Cataloghi PDF</b><small>Carica e analizza</small></div>
+          <em>{catalogs.length}</em>
+        </button>
+        <button type="button" className={section === "history" ? "active" : ""} onClick={() => setSection("history")}>
+          <span><History size={19} /></span>
+          <div><b>Storico</b><small>Calcoli salvati</small></div>
+          <em>{savedCalculations.length}</em>
+        </button>
+      </nav>
 
-        <div className="cuttingSourceGrid">
-          <label>
-            <span>Utensile dall’archivio</span>
-            <select
-              value={selectedToolId}
-              onChange={(event) => selectTool(event.target.value)}
-            >
-              <option value="">Inserimento manuale</option>
-              {tools.map((record) => {
-                const tool = normalizeToolDetails(record);
-                const diameter = parseToolNumber(tool.diameter);
+      {section === "calculator" && (
+        <div className="cuttingOrderedView">
+          <section className="cuttingFlowStep">
+            <header className="cuttingFlowHead">
+              <span>1</span>
+              <div><small>PREPARAZIONE</small><h2>Dati di partenza</h2><p>Seleziona utensile, materiale e macchina oppure compila manualmente.</p></div>
+              {(selectedToolId || values.articleCode || selectedMaterialId || selectedMachineId) && <CheckCircle2 size={20} />}
+            </header>
 
-                return (
-                  <option key={record.id} value={record.id}>
-                    {[tool.code, record.title, diameter > 0 ? `Ø ${formatNumber(diameter)} mm` : ""]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
+            <div className="cuttingSourcePanel cuttingSourceOrdered">
+              <div className="cuttingSourceGrid">
+                <label>
+                  <span>Utensile dall’archivio</span>
+                  <select value={selectedToolId} onChange={(event) => selectTool(event.target.value)}>
+                    <option value="">Inserimento manuale</option>
+                    {tools.map((record) => {
+                      const tool = normalizeToolDetails(record);
+                      const diameter = parseToolNumber(tool.diameter);
+                      return <option key={record.id} value={record.id}>{[tool.code, record.title, diameter > 0 ? `Ø ${formatNumber(diameter)} mm` : ""].filter(Boolean).join(" · ")}</option>;
+                    })}
+                  </select>
+                </label>
+                <label>
+                  <span>Materiale da lavorare</span>
+                  <select value={selectedMaterialId} onChange={(event) => selectMaterial(event.target.value)}>
+                    <option value="">Materiale manuale</option>
+                    {materials.map((record) => <option key={record.id} value={record.id}>{record.title}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Gruppo ISO</span>
+                  <select value={materialGroup} onChange={(event) => setMaterialGroup(event.target.value as MaterialIsoGroup)}>
+                    <option value="P">P · Acciai</option><option value="M">M · Inossidabili</option><option value="K">K · Ghise</option><option value="N">N · Non ferrosi</option><option value="S">S · Superleghe</option><option value="H">H · Temprati</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Macchina</span>
+                  <select value={selectedMachineId} onChange={(event) => setSelectedMachineId(event.target.value)}>
+                    <option value="">Nessuna macchina</option>
+                    {machines.map((machine) => <option key={machine.id} value={machine.id}>{machine.brand} {machine.model}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Catalogo di riferimento</span>
+                  <select value={selectedCatalogId} onChange={(event) => setSelectedCatalogId(event.target.value)}>
+                    <option value="">Nessun catalogo</option>
+                    {catalogs.map((catalog) => <option key={catalog.id} value={catalog.id}>{catalog.title}</option>)}
+                  </select>
+                </label>
+                <label className="cuttingArticleCode">
+                  <span>Codice articolo</span>
+                  <input value={values.articleCode} onChange={(event) => updateValue("articleCode", event.target.value)} placeholder="Codice utensile o inserimento manuale" />
+                </label>
+              </div>
+            </div>
+          </section>
 
-          <label>
-            <span>Materiale da lavorare</span>
-            <select
-              value={selectedMaterialId}
-              onChange={(event) => selectMaterial(event.target.value)}
-            >
-              <option value="">Materiale manuale</option>
-              {materials.map((record) => (
-                <option key={record.id} value={record.id}>
-                  {record.title}
-                </option>
+          <section className="cuttingFlowStep cuttingCalculationStep">
+            <header className="cuttingFlowHead">
+              <span>2</span>
+              <div><small>CALCOLO PRINCIPALE</small><h2>Inserimento parametri e risultati</h2><p>Scegli la lavorazione. Vengono mostrati solo i campi necessari.</p></div>
+              {validCalculation && <CheckCircle2 size={20} />}
+            </header>
+
+            <div className="cuttingTabs" role="tablist" aria-label="Calcoli disponibili">
+              {([["milling", "Fresatura"], ["drilling", "Foratura"], ["turning", "Tornitura"], ["chip", "TPC"], ["power", "Potenza"]] as [CalculatorTab, string][]).map(([tabId, label]) => (
+                <button key={tabId} type="button" className={tab === tabId ? "active" : ""} onClick={() => openTab(tabId)} role="tab" aria-selected={tab === tabId}>{label}</button>
               ))}
-            </select>
-          </label>
+            </div>
 
-          <label>
-            <span>Gruppo ISO</span>
-            <select
-              value={materialGroup}
-              onChange={(event) =>
-                setMaterialGroup(event.target.value as MaterialIsoGroup)
-              }
-            >
-              <option value="P">P · Acciai</option>
-              <option value="M">M · Inossidabili</option>
-              <option value="K">K · Ghise</option>
-              <option value="N">N · Non ferrosi</option>
-              <option value="S">S · Superleghe</option>
-              <option value="H">H · Temprati</option>
-            </select>
-          </label>
+            <div className="cuttingWorkspace">
+              {tab === "milling" && <BaseOperationFields operation="milling" values={values} updateValue={updateValue} />}
+              {tab === "drilling" && <BaseOperationFields operation="drilling" values={values} updateValue={updateValue} />}
+              {tab === "turning" && <BaseOperationFields operation="turning" values={values} updateValue={updateValue} />}
 
-          <label>
-            <span>Macchina</span>
-            <select
-              value={selectedMachineId}
-              onChange={(event) => setSelectedMachineId(event.target.value)}
-            >
-              <option value="">Nessuna macchina</option>
-              {machines.map((machine) => (
-                <option key={machine.id} value={machine.id}>
-                  {machine.brand} {machine.model}
-                </option>
-              ))}
-            </select>
-          </label>
+              {tab === "chip" && (
+                <div className="cuttingPanel">
+                  <div className="cuttingPanelHead"><div><span>SPESSORE MASSIMO DEL TRUCIOLO</span><h2>Compensazione TPC</h2></div><small>Calcolo riferito alla fresatura</small></div>
+                  <div className="cuttingInputGrid">
+                    <NumberField label="Diametro" unit="mm" value={values.diameter} onChange={(value) => updateValue("diameter", value)} />
+                    <NumberField label="Larghezza ae" unit="mm" value={values.radialWidth} onChange={(value) => updateValue("radialWidth", value)} />
+                    <NumberField label="Avanzamento fz" unit="mm/dente" value={values.feedPerTooth} onChange={(value) => updateValue("feedPerTooth", value)} />
+                    <NumberField label="Angolo di attacco φ" unit="°" value={values.approachAngle} onChange={(value) => updateValue("approachAngle", value)} />
+                    <NumberField label="hmax desiderato" unit="mm" value={values.targetChipThickness} onChange={(value) => updateValue("targetChipThickness", value)} />
+                  </div>
+                  <div className="cuttingResults three"><ResultCard label="Rapporto ae / D" value={numeric.diameter > 0 ? numeric.radialWidth / numeric.diameter : 0} decimals={3} /><ResultCard label="Spessore hmax" value={maximumChipThickness} unit="mm" decimals={3} /><ResultCard label="fz compensato" value={compensatedFeedPerTooth} unit="mm/dente" decimals={3} accent /></div>
+                </div>
+              )}
 
-          <label>
-            <span>Catalogo di riferimento</span>
-            <select
-              value={selectedCatalogId}
-              onChange={(event) =>
-                setSelectedCatalogId(event.target.value)
-              }
-            >
-              <option value="">Nessun catalogo</option>
-              {catalogs.map((catalog) => (
-                <option key={catalog.id} value={catalog.id}>
-                  {catalog.title}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+              {tab === "power" && (
+                <div className="cuttingPanel">
+                  <div className="cuttingPanelHead"><div><span>STIMA TECNOLOGICA</span><h2>Potenza e tempo di lavorazione</h2></div><small>{operationLabels[operation]} · ISO {materialGroup}</small></div>
+                  <div className="cuttingInputGrid">
+                    <NumberField label="Profondità ap" unit="mm" value={values.axialDepth} onChange={(value) => updateValue("axialDepth", value)} />
+                    {operation === "milling" && <NumberField label="Larghezza ae" unit="mm" value={values.radialWidth} onChange={(value) => updateValue("radialWidth", value)} />}
+                    <NumberField label="Lunghezza lavorata" unit="mm" value={values.length} onChange={(value) => updateValue("length", value)} />
+                    <NumberField label="Numero passate" value={values.passes} onChange={(value) => updateValue("passes", value)} />
+                  </div>
+                  <div className="cuttingResults three"><ResultCard label="Asportazione MRR" value={mrr} unit="cm³/min" decimals={2} /><ResultCard label="Potenza stimata" value={power} unit="kW" decimals={2} accent /><ResultCard label="Tempo stimato" value={machiningTime} unit="min" decimals={2} /></div>
+                  <p className="cuttingDisclaimer">La potenza è una stima orientativa. Verifica sempre i limiti della macchina e i dati del costruttore.</p>
+                </div>
+              )}
 
-        <label className="cuttingArticleCode">
-          <span>Codice articolo</span>
-          <input
-            value={values.articleCode}
-            onChange={(event) =>
-              updateValue("articleCode", event.target.value)
-            }
-            placeholder="Codice utensile o inserimento manuale"
-          />
-        </label>
-      </div>
+              {(tab === "milling" || tab === "drilling" || tab === "turning") && <div className="cuttingResults cuttingPrimaryResults"><ResultCard label="Numero di giri n" value={rpm} unit="giri/min" accent /><ResultCard label="Velocità avanzamento Vf" value={feed} unit="mm/min" accent /></div>}
+            </div>
+          </section>
 
-      <CatalogParameterLibrary
-        records={catalogParameters}
-        catalogs={catalogs}
-        operation={operation}
-        busy={busy}
-        onUse={useCatalogParameter}
-        onDelete={removeCatalogParameters}
-        onManageCatalogs={() => setCatalogManagerOpen(true)}
-      />
+          <section className="cuttingFlowStep cuttingSupportStep">
+            <header className="cuttingFlowHead">
+              <span>3</span>
+              <div><small>VERIFICA FACOLTATIVA</small><h2>Analisi e ottimizzazione</h2><p>Apri soltanto lo strumento che ti serve, senza affollare il calcolo.</p></div>
+            </header>
+            <div className="cuttingSupportChooser">
+              <button type="button" className={supportPanel === "analysis" ? "active" : ""} onClick={() => setSupportPanel(supportPanel === "analysis" ? null : "analysis")}><CheckCircle2 size={18} /><span><b>Analisi setup</b><small>Rischi, limiti e qualità del calcolo</small></span></button>
+              <button type="button" className={supportPanel === "professional" ? "active" : ""} onClick={() => setSupportPanel(supportPanel === "professional" ? null : "professional")}><Settings2 size={18} /><span><b>Strategia e macchina</b><small>Profilo, commessa ed esito</small></span></button>
+              <button type="button" className={supportPanel === "experience" ? "active" : ""} onClick={() => setSupportPanel(supportPanel === "experience" ? null : "experience")}><History size={18} /><span><b>Esperienza storica</b><small>Valori medi già utilizzati</small></span></button>
+            </div>
+            {supportPanel && (
+              <div className="cuttingSupportContent">
+                {supportPanel === "analysis" && <SetupAnalysisPanel operation={operation} materialGroup={materialGroup} strategy={strategyLabel(strategy)} articleCode={values.articleCode} machineName={selectedMachine ? `${selectedMachine.brand} ${selectedMachine.model}`.trim() : ""} valid={validCalculation} metrics={{ rpm, feed, mrr, power, torque: estimatedTorque, machiningTime }} limits={{ spindle: spindleLimit, feed: machineFeedLimit, power: machinePowerLimit, torque: machineTorqueLimit }} inputs={{ diameter: numeric.diameter, teeth: numeric.teeth, cuttingSpeed: numeric.cuttingSpeed, feedValue: activeFeedValue, axialDepth: numeric.axialDepth, radialWidth: numeric.radialWidth, length: numeric.length, passes: numeric.passes }} onApplyMachineLimits={applyMachineLimits} />}
+                {supportPanel === "professional" && <ProfessionalCuttingPanel strategy={strategy} materialGroup={materialGroup} hasCatalogBase={Boolean(catalogBase)} onStrategyChange={applyStrategy} jobs={jobs} selectedJobId={selectedJobId} onJobChange={setSelectedJobId} outcome={outcome} onOutcomeChange={setOutcome} favorite={favorite} onFavoriteChange={setFavorite} experienceNotes={experienceNotes} onExperienceNotesChange={setExperienceNotes} machineName={selectedMachine ? `${selectedMachine.brand} ${selectedMachine.model}`.trim() : ""} machineChecks={machineChecks} onApplyMachineLimits={applyMachineLimits} />}
+                {supportPanel === "experience" && <HistoricalRecommendation records={savedCalculations} operation={operation} materialGroup={materialGroup} machineId={selectedMachineId} articleCode={values.articleCode} busy={busy} readiness={setupReadiness} onUse={useHistoricalValues} />}
+              </div>
+            )}
+          </section>
 
-      {catalogManagerOpen && (
-        <div className="catalogManagerArea">
-          <div className="catalogManagerBar">
-            <b>Gestione cataloghi</b>
-            <button
-              type="button"
-              onClick={() => setCatalogManagerOpen(false)}
-              disabled={busy}
-            >
-              Chiudi gestione
-            </button>
-          </div>
-          <CatalogImporter
-            existingParameters={catalogParameters}
-            catalogs={catalogs}
-            busy={busy}
-            saveCatalog={saveCatalog}
-            saveImportedParameters={saveImportedParameters}
-            deleteCatalog={deleteCatalog}
-            notifySuccess={notifySuccess}
-            selectCatalog={setSelectedCatalogId}
-          />
+          <section className="cuttingFlowStep cuttingSaveStep">
+            <header className="cuttingFlowHead"><span>4</span><div><small>ARCHIVIAZIONE</small><h2>Salva il calcolo</h2><p>Assegna un nome chiaro. Lo ritroverai nella sezione Storico.</p></div></header>
+            {localError && <div className="cuttingWarning error"><AlertTriangle size={18} />{localError}</div>}
+            <div className="cuttingActions">
+              <label className="cuttingSaveName"><span>Nome del calcolo *</span><input value={calculationName} onChange={(event) => { setCalculationName(event.target.value); setLocalError(""); }} placeholder={`Es. ${operationLabels[operation]} supporto 125`} maxLength={80} /></label>
+              <div className="cuttingSaveButtons">
+                {editingCalculationId && <button type="button" onClick={resetCalculationForm} disabled={busy}>Annulla modifica</button>}
+                <button type="button" className="primary" onClick={handleSave} disabled={busy || !validCalculation}><Save size={17} />{busy ? "Salvataggio…" : editingCalculationId ? "Salva modifiche" : "Salva nello storico"}</button>
+              </div>
+            </div>
+          </section>
         </div>
       )}
 
-      <ProfessionalCuttingPanel
-        strategy={strategy}
-        materialGroup={materialGroup}
-        hasCatalogBase={Boolean(catalogBase)}
-        onStrategyChange={applyStrategy}
-        jobs={jobs}
-        selectedJobId={selectedJobId}
-        onJobChange={setSelectedJobId}
-        outcome={outcome}
-        onOutcomeChange={setOutcome}
-        favorite={favorite}
-        onFavoriteChange={setFavorite}
-        experienceNotes={experienceNotes}
-        onExperienceNotesChange={setExperienceNotes}
-        machineName={
-          selectedMachine
-            ? `${selectedMachine.brand} ${selectedMachine.model}`.trim()
-            : ""
-        }
-        machineChecks={machineChecks}
-        onApplyMachineLimits={applyMachineLimits}
-      />
-
-      <HistoricalRecommendation
-        records={savedCalculations}
-        operation={operation}
-        materialGroup={materialGroup}
-        machineId={selectedMachineId}
-        articleCode={values.articleCode}
-        busy={busy}
-        readiness={setupReadiness}
-        onUse={useHistoricalValues}
-      />
-
-      <div className="cuttingTabs" role="tablist" aria-label="Calcoli disponibili">
-        {([
-          ["milling", "Fresatura"],
-          ["drilling", "Foratura"],
-          ["turning", "Tornitura"],
-          ["chip", "TPC"],
-          ["power", "Potenza"],
-        ] as [CalculatorTab, string][]).map(([tabId, label]) => (
-          <button
-            key={tabId}
-            type="button"
-            className={tab === tabId ? "active" : ""}
-            onClick={() => openTab(tabId)}
-            role="tab"
-            aria-selected={tab === tabId}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="cuttingWorkspace">
-        {tab === "milling" && (
-          <BaseOperationFields
-            operation="milling"
-            values={values}
-            updateValue={updateValue}
-          />
-        )}
-
-        {tab === "drilling" && (
-          <BaseOperationFields
-            operation="drilling"
-            values={values}
-            updateValue={updateValue}
-          />
-        )}
-
-        {tab === "turning" && (
-          <BaseOperationFields
-            operation="turning"
-            values={values}
-            updateValue={updateValue}
-          />
-        )}
-
-        {tab === "chip" && (
-          <div className="cuttingPanel">
-            <div className="cuttingPanelHead">
-              <div>
-                <span>SPESSORE MASSIMO DEL TRUCIOLO</span>
-                <h2>Compensazione TPC</h2>
-              </div>
-              <small>Calcolo riferito alla fresatura</small>
-            </div>
-
-            <div className="cuttingInputGrid">
-              <NumberField label="Diametro" unit="mm" value={values.diameter} onChange={(value) => updateValue("diameter", value)} />
-              <NumberField label="Larghezza ae" unit="mm" value={values.radialWidth} onChange={(value) => updateValue("radialWidth", value)} />
-              <NumberField label="Avanzamento fz" unit="mm/dente" value={values.feedPerTooth} onChange={(value) => updateValue("feedPerTooth", value)} />
-              <NumberField label="Angolo di attacco φ" unit="°" value={values.approachAngle} onChange={(value) => updateValue("approachAngle", value)} />
-              <NumberField label="hmax desiderato" unit="mm" value={values.targetChipThickness} onChange={(value) => updateValue("targetChipThickness", value)} />
-            </div>
-
-            <div className="cuttingResults three">
-              <ResultCard label="Rapporto ae / D" value={numeric.diameter > 0 ? numeric.radialWidth / numeric.diameter : 0} decimals={3} />
-              <ResultCard label="Spessore hmax" value={maximumChipThickness} unit="mm" decimals={3} />
-              <ResultCard label="fz compensato" value={compensatedFeedPerTooth} unit="mm/dente" decimals={3} accent />
-            </div>
-          </div>
-        )}
-
-        {tab === "power" && (
-          <div className="cuttingPanel">
-            <div className="cuttingPanelHead">
-              <div>
-                <span>STIMA TECNOLOGICA</span>
-                <h2>Potenza e tempo di lavorazione</h2>
-              </div>
-              <small>{operationLabels[operation]} · ISO {materialGroup}</small>
-            </div>
-
-            <div className="cuttingInputGrid">
-              <NumberField label="Profondità ap" unit="mm" value={values.axialDepth} onChange={(value) => updateValue("axialDepth", value)} />
-              {operation === "milling" && (
-                <NumberField label="Larghezza ae" unit="mm" value={values.radialWidth} onChange={(value) => updateValue("radialWidth", value)} />
-              )}
-              <NumberField label="Lunghezza lavorata" unit="mm" value={values.length} onChange={(value) => updateValue("length", value)} />
-              <NumberField label="Numero passate" value={values.passes} onChange={(value) => updateValue("passes", value)} />
-            </div>
-
-            <div className="cuttingResults three">
-              <ResultCard label="Asportazione MRR" value={mrr} unit="cm³/min" decimals={2} />
-              <ResultCard label="Potenza stimata" value={power} unit="kW" decimals={2} accent />
-              <ResultCard label="Tempo stimato" value={machiningTime} unit="min" decimals={2} />
-            </div>
-
-            <p className="cuttingDisclaimer">
-              La potenza è una stima orientativa basata sul gruppo ISO. Verifica sempre i limiti della macchina e i dati del costruttore.
-            </p>
-          </div>
-        )}
-
-        {(tab === "milling" || tab === "drilling" || tab === "turning") && (
-          <div className="cuttingResults">
-            <ResultCard label="Numero di giri n" value={rpm} unit="giri/min" accent />
-            <ResultCard label="Velocità avanzamento Vf" value={feed} unit="mm/min" accent />
-          </div>
-        )}
-
-        <SetupAnalysisPanel
-          operation={operation}
-          materialGroup={materialGroup}
-          strategy={strategyLabel(strategy)}
-          articleCode={values.articleCode}
-          machineName={
-            selectedMachine
-              ? `${selectedMachine.brand} ${selectedMachine.model}`.trim()
-              : ""
-          }
-          valid={validCalculation}
-          metrics={{
-            rpm,
-            feed,
-            mrr,
-            power,
-            torque: estimatedTorque,
-            machiningTime,
-          }}
-          limits={{
-            spindle: spindleLimit,
-            feed: machineFeedLimit,
-            power: machinePowerLimit,
-            torque: machineTorqueLimit,
-          }}
-          inputs={{
-            diameter: numeric.diameter,
-            teeth: numeric.teeth,
-            cuttingSpeed: numeric.cuttingSpeed,
-            feedValue: activeFeedValue,
-            axialDepth: numeric.axialDepth,
-            radialWidth: numeric.radialWidth,
-            length: numeric.length,
-            passes: numeric.passes,
-          }}
-          onApplyMachineLimits={applyMachineLimits}
-        />
-
-        {localError && (
-          <div className="cuttingWarning error">
-            <AlertTriangle size={18} />
-            {localError}
-          </div>
-        )}
-
-        <SavedCalculations
-          records={savedCalculations}
-          operation={operation}
-          busy={busy}
-          onEdit={editSavedCalculation}
-          onDelete={removeSavedCalculation}
-          onClear={clearSavedHistory}
-          onFavorite={toggleSavedFavorite}
-          onPrint={printSavedCalculation}
-        />
-
-        <div className="cuttingActions">
-          <label className="cuttingSaveName">
-            <span>Nome del calcolo *</span>
-            <input
-              value={calculationName}
-              onChange={(event) => {
-                setCalculationName(event.target.value);
-                setLocalError("");
-              }}
-              placeholder={`Es. ${operationLabels[operation]} supporto 125`}
-              maxLength={80}
-            />
-          </label>
-
-          <div className="cuttingSaveButtons">
-            {editingCalculationId && (
-              <button
-                type="button"
-                onClick={resetCalculationForm}
-                disabled={busy}
-              >
-                Annulla modifica
-              </button>
-            )}
-            <button
-              type="button"
-              className="primary"
-              onClick={handleSave}
-              disabled={busy || !validCalculation}
-            >
-              <Save size={17} />
-              {busy
-                ? "Salvataggio…"
-                : editingCalculationId
-                  ? "Salva modifiche"
-                  : "Salva nello storico"}
-            </button>
-          </div>
+      {section === "library" && (
+        <div className="cuttingStandaloneSection">
+          <header><span><Library size={21} /></span><div><small>ARCHIVIO STRUTTURATO</small><h2>Parametri estratti dai cataloghi</h2><p>Scegli una scheda verificata e trasferiscila nel calcolatore.</p></div></header>
+          <CatalogParameterLibrary records={catalogParameters} catalogs={catalogs} operation={operation} busy={busy} onUse={useCatalogParameter} onDelete={removeCatalogParameters} onManageCatalogs={() => setSection("catalogs")} />
         </div>
-      </div>
+      )}
+
+      {section === "catalogs" && (
+        <div className="cuttingStandaloneSection">
+          <header><span><UploadCloud size={21} /></span><div><small>GESTIONE SORGENTI</small><h2>Cataloghi PDF</h2><p>Carica, analizza e controlla i dati prima dell’importazione.</p></div></header>
+          <CatalogImporter existingParameters={catalogParameters} catalogs={catalogs} busy={busy} saveCatalog={saveCatalog} saveImportedParameters={saveImportedParameters} deleteCatalog={deleteCatalog} notifySuccess={notifySuccess} selectCatalog={setSelectedCatalogId} />
+        </div>
+      )}
+
+      {section === "history" && (
+        <div className="cuttingStandaloneSection">
+          <header><span><Archive size={21} /></span><div><small>RISULTATI CONSOLIDATI</small><h2>Storico dei calcoli</h2><p>Consulta, modifica, stampa o riutilizza i calcoli salvati.</p></div></header>
+          <div className="cuttingHistoryOperationSwitch">
+            {(["milling", "drilling", "turning"] as CuttingOperation[]).map((value) => <button key={value} type="button" className={operation === value ? "active" : ""} onClick={() => { setOperation(value); setTab(value); }}>{operationLabels[value]}<em>{savedCalculations.filter((record) => savedOperation(record) === value).length}</em></button>)}
+          </div>
+          <SavedCalculations records={savedCalculations} operation={operation} busy={busy} onEdit={editSavedCalculation} onDelete={removeSavedCalculation} onClear={clearSavedHistory} onFavorite={toggleSavedFavorite} onPrint={printSavedCalculation} />
+        </div>
+      )}
     </section>
   );
 }

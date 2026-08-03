@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import PwaManager from "@/components/common/PwaManager";
 import "./globals.css";
 import "./programs.css";
+import "./cutting-organized.css";
 
 export const metadata: Metadata = {
   title: "Smart CNC Manager Professional",
