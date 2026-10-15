@@ -1,5 +1,7 @@
 import { recordModuleConfigs } from "@/lib/moduleConfigs";
 import { createEmptyToolDetails } from "@/lib/tools";
+import { createEmptyManualDetails } from "@/lib/manuals";
+import { createEmptyProgramDetails } from "@/lib/programs";
 import {
   Machine,
   MaintenanceRecord,
@@ -50,6 +52,9 @@ export function createEmptyMaintenance(
     hours: "",
     cost: "",
     parts: "",
+    priority: "Media",
+    recurrence: "Nessuna",
+    checklist: [],
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -76,6 +81,14 @@ export function createEmptyRecord(
 
   if (moduleId === "tools") {
     record.tool = createEmptyToolDetails();
+  }
+
+  if (moduleId === "manuals") {
+    record.manual = createEmptyManualDetails();
+  }
+
+  if (moduleId === "programs") {
+    record.program = createEmptyProgramDetails();
   }
 
   return record;

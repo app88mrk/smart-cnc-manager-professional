@@ -1,6 +1,15 @@
 import { getApps, initializeApp } from "firebase/app";
+import {
+  initializeAppCheck,
+  ReCaptchaV3Provider,
+} from "firebase/app-check";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const config = {
@@ -14,5 +23,38 @@ const config = {
 export const firebaseConfigured = Boolean(config.apiKey && config.projectId && config.appId);
 const app = firebaseConfigured ? (getApps()[0] ?? initializeApp(config)) : null;
 export const auth = app ? getAuth(app) : null;
-export const db = app ? getFirestore(app) : null;
+export const db = app ? initializeOfflineFirestore(app) : null;
 export const storage = app ? getStorage(app) : null;
+
+if (
+  app &&
+  typeof window !== "undefined" &&
+  process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY
+) {
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(
+        process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY
+      ),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch {
+    // In sviluppo/HMR App Check può essere già inizializzato.
+  }
+}
+
+function initializeOfflineFirestore(firebaseApp: NonNullable<typeof app>) {
+  if (typeof window === "undefined") {
+    return getFirestore(firebaseApp);
+  }
+
+  try {
+    return initializeFirestore(firebaseApp, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    });
+  } catch {
+    return getFirestore(firebaseApp);
+  }
+}

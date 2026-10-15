@@ -1,20 +1,23 @@
 {
   "name": "smart-cnc-manager",
-  "version": "2.8.0",
+  "version": "2.12.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --no-warnings --test tests/professional.test.ts",
+    "check": "npm run test && npm run build"
   },
   "dependencies": {
     "firebase": "^12.2.1",
     "lucide-react": "^0.468.0",
     "next": "^15.5.2",
-    "pdfjs-dist": "^6.1.200",
+    "pdfjs-dist": "^5.4.296",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "read-excel-file": "^5.8.8"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

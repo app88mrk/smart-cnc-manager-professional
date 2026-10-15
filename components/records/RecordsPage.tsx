@@ -70,7 +70,11 @@ export default function RecordsPage({
         </div>
       )}
 
-      <section className="recordGrid">
+      <section
+        className={`recordGrid ${
+          moduleId === "manuals" ? "manualsGrid" : ""
+        }`}
+      >
         {records.length ? (
           records.map((record) => (
             <article className="genericRecordCard" key={record.id}>

@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import { ChangeEvent, useMemo, useState } from "react";

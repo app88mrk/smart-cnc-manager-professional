@@ -5,8 +5,10 @@ import { useCallback, useEffect, useState } from "react";
 import {
   listRecords,
   removeRecord,
+  removeRecords as persistRemovedRecords,
   replaceRecords as persistRecords,
   saveRecord as persistRecord,
+  saveRecords as persistNewRecords,
 } from "@/lib/records";
 import { RecordItem } from "@/types";
 
@@ -19,6 +21,9 @@ type UseRecordsOptions = {
 type SaveRecordInput = {
   record: RecordItem;
   attachment: File | null;
+  background?: boolean;
+  onUploadProgress?: (percent: number) => void;
+  preservePreviousFile?: boolean;
 };
 
 export default function useRecords({
@@ -53,8 +58,14 @@ export default function useRecords({
   }, [refreshRecords]);
 
   const saveRecord = useCallback(
-    async ({ record, attachment }: SaveRecordInput) => {
-      setRecordsLoading(true);
+    async ({
+      record,
+      attachment,
+      background = false,
+      onUploadProgress,
+      preservePreviousFile = false,
+    }: SaveRecordInput) => {
+      if (!background) setRecordsLoading(true);
 
       try {
         await persistRecord(
@@ -63,14 +74,16 @@ export default function useRecords({
             ...record,
             updatedAt: new Date().toISOString(),
           },
-          attachment
+          attachment,
+          onUploadProgress,
+          preservePreviousFile
         );
         setRecords(await listRecords(uid));
       } catch (error) {
         onError(errorMessage(error));
         throw error;
       } finally {
-        setRecordsLoading(false);
+        if (!background) setRecordsLoading(false);
       }
     },
     [onError, uid]
@@ -82,6 +95,50 @@ export default function useRecords({
 
       try {
         await removeRecord(uid, record);
+        setRecords(await listRecords(uid));
+      } catch (error) {
+        onError(errorMessage(error));
+        throw error;
+      } finally {
+        setRecordsLoading(false);
+      }
+    },
+    [onError, uid]
+  );
+
+  const deleteRecords = useCallback(
+    async (recordsToDelete: RecordItem[]) => {
+      setRecordsLoading(true);
+
+      try {
+        await persistRemovedRecords(uid, recordsToDelete);
+        setRecords(await listRecords(uid));
+      } catch (error) {
+        onError(errorMessage(error));
+        throw error;
+      } finally {
+        setRecordsLoading(false);
+      }
+    },
+    [onError, uid]
+  );
+
+  const saveRecords = useCallback(
+    async (
+      nextRecords: RecordItem[],
+      onProgress?: (percent: number) => void
+    ) => {
+      setRecordsLoading(true);
+
+      try {
+        await persistNewRecords(
+          uid,
+          nextRecords.map((record) => ({
+            ...record,
+            updatedAt: new Date().toISOString(),
+          })),
+          onProgress
+        );
         setRecords(await listRecords(uid));
       } catch (error) {
         onError(errorMessage(error));
@@ -115,7 +172,9 @@ export default function useRecords({
     recordsLoading,
     refreshRecords,
     saveRecord,
+    saveRecords,
     deleteRecord,
+    deleteRecords,
     replaceRecords,
   };
 }

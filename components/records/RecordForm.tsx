@@ -59,10 +59,10 @@ export default function RecordForm({
 
     if (
       attachment &&
-      attachment.size > 100 * 1024 * 1024
+      attachment.size > 500 * 1024 * 1024
     ) {
       setValidationError(
-        "L’allegato non può superare 100 MB."
+        "L’allegato non può superare 500 MB."
       );
       return;
     }

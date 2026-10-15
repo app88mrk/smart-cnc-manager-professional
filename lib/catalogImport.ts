@@ -1226,26 +1226,11 @@ function transactionComplete(transaction: IDBTransaction) {
   });
 }
 
-// Compatibility adapter for the catalog importer UI.
-export type CatalogProgress = { fileName: string; page: number; totalPages: number };
-export type CatalogCandidate = {
-  id: string; code: string; name: string; category: string; diameter: string;
-  teeth: string; cuttingSpeed: string; feed: string; feedKind: "fz" | "f";
-  sourcePage?: number; selected: boolean; valid: boolean; duplicate: boolean;
-  warnings: string[]; errors: string[];
-};
+export type CatalogProgress = { fileName: string; page: number; totalPages: number; message?: string; current?: number; total?: number };
+export type CatalogCandidate = { id:string; code:string; name:string; category:string; diameter:string|number; teeth:string|number; cuttingSpeed:string|number; feed:string|number; feedKind:"fz"|"f"; sourcePage?:number; selected:boolean; valid:boolean; duplicate:boolean; warnings:string[]; errors:string[] };
 export async function analyzeCatalogFile(file: File, onProgress?: (progress: CatalogProgress) => void): Promise<CatalogCandidate[]> {
   const catalog = await extractCatalogFromFile(file, { onProgress });
-  return catalog.tools.map((tool, index) => ({
-    id: `${catalog.id}-${index}`, code: tool.article, name: tool.excerpt,
-    category: tool.category, diameter: tool.diameter, teeth: tool.teeth,
-    cuttingSpeed: tool.parameterSets[0]?.vc || "", feed: tool.parameterSets[0]?.feed || "", feedKind: tool.parameterSets[0]?.feedKind === "feed" ? "f" : "fz",
-    sourcePage: tool.page, selected: true, valid: true, duplicate: false,
-    warnings: [], errors: [],
-  }));
+  return catalog.tools.map((tool, index) => { const set = tool.parameterSets[0]; return { id:`${catalog.id}-${index}`, code:tool.article, name:tool.excerpt, category:tool.category, diameter:tool.diameter, teeth:tool.teeth, cuttingSpeed:set?.vc || "", feed:set?.feed || "", feedKind:set?.feedKind === "feed" ? "f" : "fz", sourcePage:tool.page, selected:true, valid:true, duplicate:false, warnings:[], errors:[] }; });
 }
-export function validateCatalogCandidates(candidates: CatalogCandidate[], existing: unknown[]): CatalogCandidate[] {
-  const codes = new Set((existing as Array<{tool?: {code?: string}}>).map(x => x.tool?.code).filter(Boolean));
-  return candidates.map(c => ({ ...c, duplicate: codes.has(c.code) }));
-}
+export function validateCatalogCandidates(candidates: CatalogCandidate[], existing: unknown[]): CatalogCandidate[] { const codes = new Set((existing as Array<{tool?:{code?:string}}>).map(x=>x.tool?.code).filter(Boolean)); return candidates.map(c=>({...c,duplicate:codes.has(c.code)})); }
 export function candidateToCalculationRecord(candidate: CatalogCandidate) { return candidate; }

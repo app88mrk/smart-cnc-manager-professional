@@ -6,18 +6,19 @@ import {
   orderBy,
   query,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
 import {
   deleteObject,
   getDownloadURL,
   ref,
-  uploadBytes,
+  uploadBytesResumable,
 } from "firebase/storage";
 
 import { db, storage } from "@/lib/firebase";
 import { RecordItem } from "@/types";
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const MAX_FILE_SIZE = 500 * 1024 * 1024;
 const localKey = (uid: string) => `smart-cnc-records-${uid}`;
 
 function readLocal(uid: string): RecordItem[] {
@@ -58,7 +59,9 @@ export async function listRecords(uid: string): Promise<RecordItem[]> {
 export async function saveRecord(
   uid: string,
   record: RecordItem,
-  attachment?: File | null
+  attachment?: File | null,
+  onUploadProgress?: (percent: number) => void,
+  preservePreviousFile = false
 ): Promise<RecordItem> {
   let saved = { ...record };
 
@@ -74,10 +77,10 @@ export async function saveRecord(
     }
 
     if (attachment.size > MAX_FILE_SIZE) {
-      throw new Error("Il file supera il limite di 100 MB.");
+      throw new Error("Il file supera il limite di 500 MB.");
     }
 
-    if (saved.filePath) {
+    if (saved.filePath && !preservePreviousFile) {
       try {
         await deleteObject(ref(storage, saved.filePath));
       } catch {
@@ -94,10 +97,27 @@ export async function saveRecord(
       `${Date.now()}-${safeName}`;
     const fileReference = ref(storage, filePath);
 
-    await uploadBytes(fileReference, attachment, {
+    const uploadTask = uploadBytesResumable(fileReference, attachment, {
       contentType:
         attachment.type || "application/octet-stream",
     });
+
+    await new Promise<void>((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const percent = snapshot.totalBytes
+            ? Math.round(
+                (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+              )
+            : 0;
+          onUploadProgress?.(percent);
+        },
+        reject,
+        resolve
+      );
+    });
+    onUploadProgress?.(100);
 
     saved = {
       ...saved,
@@ -133,16 +153,65 @@ export async function saveRecord(
   return saved;
 }
 
+export async function saveRecords(
+  uid: string,
+  incomingRecords: RecordItem[],
+  onProgress?: (percent: number) => void
+): Promise<void> {
+  if (!incomingRecords.length) {
+    onProgress?.(100);
+    return;
+  }
+
+  onProgress?.(0);
+
+  if (!db) {
+    const byId = new Map(
+      readLocal(uid).map((record) => [record.id, record])
+    );
+
+    incomingRecords.forEach((record) => {
+      byId.set(record.id, record);
+    });
+    writeLocal(uid, Array.from(byId.values()));
+    onProgress?.(100);
+    return;
+  }
+
+  const chunks = chunkRecords(incomingRecords, 400);
+  let completed = 0;
+
+  for (const chunk of chunks) {
+    const batch = writeBatch(db);
+
+    chunk.forEach((record) => {
+      batch.set(
+        doc(db!, "users", uid, "records", record.id),
+        record
+      );
+    });
+    await batch.commit();
+    completed += chunk.length;
+    onProgress?.(
+      Math.round((completed / incomingRecords.length) * 100)
+    );
+  }
+}
+
 export async function removeRecord(
   uid: string,
   record: RecordItem
 ): Promise<void> {
-  if (storage && record.filePath) {
-    try {
-      await deleteObject(ref(storage, record.filePath));
-    } catch {
-      // Il file potrebbe essere già stato rimosso.
-    }
+  if (storage) {
+    await Promise.all(
+      recordStoragePaths(record).map(async (filePath) => {
+        try {
+          await deleteObject(ref(storage!, filePath));
+        } catch {
+          // Il file potrebbe essere già stato rimosso.
+        }
+      })
+    );
   }
 
   if (db) {
@@ -154,6 +223,44 @@ export async function removeRecord(
       uid,
       readLocal(uid).filter((item) => item.id !== record.id)
     );
+  }
+}
+
+export async function removeRecords(
+  uid: string,
+  records: RecordItem[]
+): Promise<void> {
+  if (!records.length) return;
+
+  if (storage) {
+    await Promise.all(
+      Array.from(
+        new Set(records.flatMap(recordStoragePaths))
+      ).map(async (filePath) => {
+          try {
+            await deleteObject(ref(storage!, filePath));
+          } catch {
+            // Il file potrebbe essere già stato rimosso.
+          }
+        })
+    );
+  }
+
+  if (!db) {
+    const ids = new Set(records.map((record) => record.id));
+    writeLocal(
+      uid,
+      readLocal(uid).filter((record) => !ids.has(record.id))
+    );
+    return;
+  }
+
+  for (const chunk of chunkRecords(records, 400)) {
+    const batch = writeBatch(db);
+    chunk.forEach((record) => {
+      batch.delete(doc(db!, "users", uid, "records", record.id));
+    });
+    await batch.commit();
   }
 }
 
@@ -183,4 +290,27 @@ export async function replaceRecords(
       )
     ),
   ]);
+}
+
+function chunkRecords(records: RecordItem[], size: number) {
+  const chunks: RecordItem[][] = [];
+
+  for (let index = 0; index < records.length; index += size) {
+    chunks.push(records.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
+function recordStoragePaths(record: RecordItem) {
+  return Array.from(
+    new Set(
+      [
+        record.filePath,
+        ...(record.program?.revisions.map(
+          (revision) => revision.filePath
+        ) || []),
+      ].filter((value): value is string => Boolean(value))
+    )
+  );
 }
