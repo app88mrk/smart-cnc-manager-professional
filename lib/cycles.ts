@@ -1,6 +1,6 @@
 import { collection, deleteDoc, doc, getDocs, orderBy, query, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-export type Cycle={id:string;name:string;machine:string;material:string;program:string;notes:string;updatedAt:string};
+export type Cycle={id:string;name:string;machine:string;material:string;program:string;calculation:string;calculationId?:string;notes:string;updatedAt:string};
 const key=(uid:string)=>`smart-cnc-cycles-${uid}`;
 function local(uid:string):Cycle[]{try{return JSON.parse(localStorage.getItem(key(uid))||"[]")}catch{return[]}}
 function write(uid:string,items:Cycle[]){localStorage.setItem(key(uid),JSON.stringify(items))}

@@ -676,7 +676,7 @@ export default function AppShell() {
             notifySuccess={showSuccess}
           />
         ) : active === "cycles" ? (
-          <CyclesPage uid={uid} />
+          <CyclesPage uid={uid} calculations={records} />
         ) : isRecordModuleId(active) ? (
           <RecordsPage
             moduleId={active}
