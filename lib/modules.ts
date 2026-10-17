@@ -6,6 +6,7 @@ export const modules: ModuleDefinition[] = [
   { id:"tools", label:"Utensili", description:"Anagrafica, scorte e vita utensile", icon:"⚙", state:"active" },
   { id:"cutting", label:"Parametri di taglio", description:"Fresatura, foratura, tornitura e potenza", icon:"∑", state:"active" },
   { id:"jobs", label:"Lavorazioni", description:"Cicli, programmi, utensili e risultati", icon:"◫", state:"active" },
+  { id:"cycles", label:"Cicli CNC", description:"Archivio dei cicli operativi salvati", icon:"↻", state:"active" },
   { id:"alarms", label:"Allarmi", description:"Cause, soluzioni e storico", icon:"⚠", state:"active" },
   { id:"maintenance", label:"Manutenzioni", description:"Scadenze, ricambi e interventi", icon:"◆", state:"active" },
   { id:"notes", label:"Knowledge Base", description:"Procedure, idee e checklist", icon:"✎", state:"active" },

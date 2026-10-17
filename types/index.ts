@@ -5,6 +5,7 @@ export type ModuleId =
   | "tools"
   | "cutting"
   | "jobs"
+  | "cycles"
   | "alarms"
   | "maintenance"
   | "notes"

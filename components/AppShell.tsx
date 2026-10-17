@@ -11,6 +11,7 @@ import ConfirmDialog from "@/components/common/ConfirmDialog";
 import FeedbackBanner from "@/components/common/FeedbackBanner";
 import NotificationCenter from "@/components/common/NotificationCenter";
 import CuttingParametersPage from "@/components/cutting/CuttingParametersPage";
+import CyclesPage from "@/components/cycles/CyclesPage";
 import Dashboard from "@/components/dashboard/Dashboard";
 import JobsPage from "@/components/jobs/JobsPage";
 import ManualForm from "@/components/manuals/ManualForm";
@@ -674,6 +675,8 @@ export default function AppShell() {
             }
             notifySuccess={showSuccess}
           />
+        ) : active === "cycles" ? (
+          <CyclesPage />
         ) : isRecordModuleId(active) ? (
           <RecordsPage
             moduleId={active}
