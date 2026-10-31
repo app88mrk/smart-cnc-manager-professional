@@ -52,7 +52,7 @@ function makeLesson(module,item){
  return {tag,desc,code,flow,caution};
 }
 function selectTopic(module,item){
- selected=item;renderMenu();if(item === "Struttura programmi O e sequenze N"){lesson.innerHTML=`<div class="academyTextLesson"><div class="eyebrow">${esc(module)}</div><h2>${esc(item)}</h2><pre id="lessonPdfText">Caricamento del testo della lezione…</pre><h3>PDF originale</h3><iframe class="lessonPdf lessonPdfFull" title="Lezione 01 Struttura programmi O e sequenze N" src="/Lezione_01_Struttura_programmi_O_N_FANUC32i_CMZ_TA_LEGGIBILE.pdf"></iframe></div>`;fetch("/Lezione_01_Struttura_programmi_O_N_FANUC32i_CMZ_TA_LEGGIBILE.txt").then(r=>r.text()).then(t=>{document.getElementById("lessonPdfText").textContent=t;});return;}const x=makeLesson(module,item);const pdfSection=item === "Struttura programmi O e sequenze N" ? `<section><h3>7. Lezione PDF allegata</h3><p class="muted">Materiale didattico completo per la struttura dei programmi O e le sequenze N.</p><iframe class="lessonPdf" title="Lezione 01 Struttura programmi O e sequenze N" src="/Lezione_01_Struttura_programmi_O_N_FANUC32i_CMZ_TA_LEGGIBILE.pdf"></iframe><p><a class="action" href="/Lezione_01_Struttura_programmi_O_N_FANUC32i_CMZ_TA_LEGGIBILE.pdf" target="_blank" rel="noreferrer">Apri il PDF</a></p></section>` : "";
+ selected=item;renderMenu();if(item === "Struttura programmi O e sequenze N"){lesson.innerHTML=`<iframe class="lessonPdf lessonPdfFull" title="Lezione 01 Struttura programmi O e sequenze N" src="/Lezione_01_Struttura_programmi_O_N_FANUC32i_CMZ_TA_LEGGIBILE.pdf"></iframe>`;return;}const x=makeLesson(module,item);const pdfSection=item === "Struttura programmi O e sequenze N" ? `<section><h3>7. Lezione PDF allegata</h3><p class="muted">Materiale didattico completo per la struttura dei programmi O e le sequenze N.</p><iframe class="lessonPdf" title="Lezione 01 Struttura programmi O e sequenze N" src="/Lezione_01_Struttura_programmi_O_N_FANUC32i_CMZ_TA_LEGGIBILE.pdf"></iframe><p><a class="action" href="/Lezione_01_Struttura_programmi_O_N_FANUC32i_CMZ_TA_LEGGIBILE.pdf" target="_blank" rel="noreferrer">Apri il PDF</a></p></section>` : "";
  lesson.innerHTML=`<div class="eyebrow">${esc(module)}</div><h2>${esc(item)}</h2>
  <section><h3>1. Che cos'è</h3><p>${esc(x.desc)}</p></section>
  <section><h3>2. Sintassi / esempio didattico</h3><pre>${esc(x.code)}</pre><button class="action secondary" id="copy">Copia esempio</button></section>
@@ -67,7 +67,6 @@ async function copy(t){try{await navigator.clipboard.writeText(t);alert('Testo c
 search.addEventListener('input',renderMenu);
 renderMenu();
 </script></body></html>
-
 
 
 
