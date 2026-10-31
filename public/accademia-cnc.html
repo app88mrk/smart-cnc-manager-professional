@@ -52,14 +52,14 @@ function makeLesson(module,item){
  return {tag,desc,code,flow,caution};
 }
 function selectTopic(module,item){
- selected=item;renderMenu();const x=makeLesson(module,item);
+ selected=item;renderMenu();const x=makeLesson(module,item);const pdfSection=item === "Struttura programmi O e sequenze N" ? `<section><h3>7. Lezione PDF allegata</h3><p class="muted">Materiale didattico completo per la struttura dei programmi O e le sequenze N.</p><iframe class="lessonPdf" title="Lezione 01 Struttura programmi O e sequenze N" src="/Lezione_01_Struttura_programmi_O_N_FANUC32i_CMZ_TA_LEGGIBILE.pdf"></iframe><p><a class="action" href="/Lezione_01_Struttura_programmi_O_N_FANUC32i_CMZ_TA_LEGGIBILE.pdf" target="_blank" rel="noreferrer">Apri il PDF</a></p></section>` : "";
  lesson.innerHTML=`<div class="eyebrow">${esc(module)}</div><h2>${esc(item)}</h2>
  <section><h3>1. Che cos'è</h3><p>${esc(x.desc)}</p></section>
  <section><h3>2. Sintassi / esempio didattico</h3><pre>${esc(x.code)}</pre><button class="action secondary" id="copy">Copia esempio</button></section>
  <section><h3>3. Come interpretarlo</h3><p>${esc(x.flow)}</p></section>
  <section><h3>4. Procedura di studio</h3><ol><li>Individua la sintassi ufficiale nel manuale FANUC e nel manuale CMZ.</li><li>Controlla variabili, modalità attive, destinazioni N e condizioni di uscita.</li><li>Simula i valori e il flusso del programma blocco per blocco.</li><li>Esegui prove a vuoto soltanto secondo le procedure aziendali e con supervisione qualificata.</li></ol></section>
  <section><h3>5. Attenzione / compatibilità</h3><div class="callout">${esc(x.caution)}</div></section>
- <section><h3>6. Chiedi una lezione completa a ChatGPT</h3><p class="muted small">Il file funziona offline e non può richiamare automaticamente il modello ChatGPT. Puoi copiare la richiesta qui sotto e incollarla nella chat per ricevere una spiegazione personalizzata e approfondita.</p><pre id="prompt">Preparami una lezione completa su "${item}" per tornio CMZ TA con FANUC 32i Model B. Spiega teoria, sintassi ufficiale, varianti, esempi commentati riga per riga, simulazione del flusso e delle variabili, errori comuni, compatibilità con ISO tipo A e Macro B, e proponi esercizi con soluzioni. Distingui ciò che è standard da ciò che dipende dalla configurazione macchina.</pre><button class="action" id="copyprompt">Copia richiesta lezione</button></section>`;
+ <section><h3>6. Chiedi una lezione completa a ChatGPT</h3><p class="muted small">Il file funziona offline e non può richiamare automaticamente il modello ChatGPT. Puoi copiare la richiesta qui sotto e incollarla nella chat per ricevere una spiegazione personalizzata e approfondita.</p><pre id="prompt">Preparami una lezione completa su "${item}" per tornio CMZ TA con FANUC 32i Model B. Spiega teoria, sintassi ufficiale, varianti, esempi commentati riga per riga, simulazione del flusso e delle variabili, errori comuni, compatibilità con ISO tipo A e Macro B, e proponi esercizi con soluzioni. Distingui ciò che è standard da ciò che dipende dalla configurazione macchina.</pre><button class="action" id="copyprompt">Copia richiesta lezione</button></section>${pdfSection}`;
  document.getElementById('copy').onclick=()=>copy(x.code);
  document.getElementById('copyprompt').onclick=()=>copy(document.getElementById('prompt').textContent);
 }
@@ -67,3 +67,5 @@ async function copy(t){try{await navigator.clipboard.writeText(t);alert('Testo c
 search.addEventListener('input',renderMenu);
 renderMenu();
 </script></body></html>
+
+
