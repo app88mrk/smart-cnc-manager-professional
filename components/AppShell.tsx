@@ -12,6 +12,7 @@ import FeedbackBanner from "@/components/common/FeedbackBanner";
 import NotificationCenter from "@/components/common/NotificationCenter";
 import CuttingParametersPage from "@/components/cutting/CuttingParametersPage";
 import CyclesPage from "@/components/cycles/CyclesPage";
+import AcademyPage from "@/components/academy/AcademyPage";
 import Dashboard from "@/components/dashboard/Dashboard";
 import JobsPage from "@/components/jobs/JobsPage";
 import ManualForm from "@/components/manuals/ManualForm";
@@ -677,6 +678,8 @@ export default function AppShell() {
           />
         ) : active === "cycles" ? (
           <CyclesPage uid={uid} calculations={records} />
+        ) : active === "academy" ? (
+          <AcademyPage />
         ) : isRecordModuleId(active) ? (
           <RecordsPage
             moduleId={active}
@@ -1027,3 +1030,5 @@ function formatShortDate(value: string) {
     year: "numeric",
   }).format(new Date(`${value}T12:00:00`));
 }
+
+

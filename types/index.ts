@@ -6,6 +6,7 @@ export type ModuleId =
   | "cutting"
   | "jobs"
   | "cycles"
+  | "academy"
   | "alarms"
   | "maintenance"
   | "notes"
@@ -248,3 +249,5 @@ export interface MaintenanceRecord {
   createdAt: string;
   updatedAt: string;
 }
+
+
