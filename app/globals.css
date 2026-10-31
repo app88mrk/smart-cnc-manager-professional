@@ -121,3 +121,4 @@
 
 .lessonPdf{width:100%;height:620px;border:1px solid var(--line);border-radius:12px;background:#080e19}
 .lessonPdfFull{height:calc(100vh - 150px);min-height:760px;border:0;border-radius:0}
+.academyTextLesson{padding:4px}.academyTextLesson>pre{white-space:pre-wrap;line-height:1.65;background:#080e19;color:#edf3ff}.academyTextLesson h3{margin-top:22px;color:var(--accent)}
