@@ -677,7 +677,7 @@ export default function AppShell() {
             notifySuccess={showSuccess}
           />
         ) : active === "cycles" ? (
-          <CyclesPage uid={uid} calculations={records} />
+          <CyclesPage uid={uid} />
         ) : active === "academy" ? (
           <AcademyPage close={() => openModule("dashboard")} />
         ) : isRecordModuleId(active) ? (
@@ -1030,6 +1030,7 @@ function formatShortDate(value: string) {
     year: "numeric",
   }).format(new Date(`${value}T12:00:00`));
 }
+
 
 
 
