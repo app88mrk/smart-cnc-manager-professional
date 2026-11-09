@@ -1144,6 +1144,7 @@ function SavedCalculations({
   const [query, setQuery] = useState("");
   const [visibleLimit, setVisibleLimit] = useState(24);
   const [previewImage, setPreviewImage] = useState<{ src: string; title: string } | null>(null);
+  const [previewRecord, setPreviewRecord] = useState<RecordItem | null>(null);
   const matchingRecords = records
     .filter((record) => savedOperation(record) === operation)
     .sort(
@@ -1257,7 +1258,7 @@ function SavedCalculations({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onPrint(record)}
+                    onClick={() => setPreviewRecord(record)}
                     disabled={busy}
                     title="Stampa o salva in PDF"
                     aria-label={`Stampa ${record.title}`}
@@ -1300,6 +1301,15 @@ function SavedCalculations({
         <div className="cuttingPhotoLightbox" role="dialog" aria-modal="true" aria-label={`Foto ${previewImage.title}`} onClick={() => setPreviewImage(null)}>
           <button type="button" className="cuttingPhotoClose" onClick={() => setPreviewImage(null)} aria-label="Chiudi foto"><X size={20} /></button>
           <img src={previewImage.src} alt={`Foto allegata a ${previewImage.title}`} onClick={(event) => event.stopPropagation()} />
+        </div>
+      )}
+      {previewRecord && (
+        <div className="cuttingPhotoLightbox cuttingPdfLightbox" role="dialog" aria-modal="true" aria-label={`Anteprima PDF ${previewRecord.title}`} onClick={() => setPreviewRecord(null)}>
+          <div className="cuttingPdfPreview" onClick={(event) => event.stopPropagation()}>
+            <div className="cuttingPdfToolbar"><b>Anteprima PDF</b><div><button type="button" onClick={() => { const printWindow = window.open("", "_blank"); if (printWindow) { printWindow.document.write(`<pre style="font-family:Arial;white-space:pre-wrap">${escapeHtml(previewRecord.notes)}</pre>`); printWindow.document.close(); printWindow.print(); } }}>Stampa / Salva PDF</button><button type="button" className="cuttingPhotoCloseInline" onClick={() => setPreviewRecord(null)} aria-label="Chiudi anteprima"><X size={18} /></button></div></div>
+            <header><span>SMART CNC MANAGER · SCHEDA PARAMETRI</span><h1>{previewRecord.title}</h1><p>{previewRecord.subtitle}</p></header>
+            <table><tbody>{previewRecord.notes.split("\n").filter((line) => line && !line.startsWith("[")).map((line, index) => { const separator = line.indexOf(":"); return <tr key={`${previewRecord.id}-${index}`}><th>{separator >= 0 ? line.slice(0, separator) : "Nota"}</th><td>{separator >= 0 ? line.slice(separator + 1).trim() : line}</td></tr>; })}</tbody></table>
+          </div>
         </div>
       )}
     </section>
