@@ -206,6 +206,7 @@ export default function CuttingParametersPage({
     useState<CuttingOutcome>("Da testare");
   const [favorite, setFavorite] = useState(false);
   const [experienceNotes, setExperienceNotes] = useState("");
+  const [imageDataUrl, setImageDataUrl] = useState("");
 
   const numeric = useMemo(
     () => ({
@@ -519,6 +520,7 @@ export default function CuttingParametersPage({
     setOutcome("Da testare");
     setFavorite(false);
     setExperienceNotes("");
+    setImageDataUrl("");
     setLocalError("");
   }
 
@@ -544,6 +546,7 @@ export default function CuttingParametersPage({
     setOutcome(savedOutcome(record.notes));
     setFavorite(/^s[iì]$/i.test(savedText(record.notes, "Preferito")));
     setExperienceNotes(savedText(record.notes, "Note risultato"));
+    setImageDataUrl(record.imageDataUrl || "");
     setValues({
       articleCode: savedText(record.notes, "Codice articolo"),
       diameter: savedNumber(record.notes, "Diametro"),
@@ -898,6 +901,7 @@ export default function CuttingParametersPage({
         notes,
         createdAt: existingRecord?.createdAt || now,
         updatedAt: now,
+        imageDataUrl: imageDataUrl || undefined,
       });
       notifySuccess(
         editingCalculationId
@@ -1079,6 +1083,8 @@ export default function CuttingParametersPage({
             {localError && <div className="cuttingWarning error"><AlertTriangle size={18} />{localError}</div>}
             <div className="cuttingActions">
               <label className="cuttingSaveName"><span>Nome del calcolo *</span><input value={calculationName} onChange={(event) => { setCalculationName(event.target.value); setLocalError(""); }} placeholder={`Es. ${operationLabels[operation]} supporto 125`} maxLength={80} /></label>
+              <label className="cuttingSaveImage"><span>Foto utensile o lavorazione (facoltativa)</span><input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 400 * 1024) { setLocalError("La foto deve essere inferiore a 400 KB."); event.currentTarget.value = ""; return; } const reader = new FileReader(); reader.onload = () => setImageDataUrl(String(reader.result || "")); reader.readAsDataURL(file); }} /></label>
+              {imageDataUrl && <div className="cuttingSaveImagePreview"><img src={imageDataUrl} alt="Anteprima foto allegata" /><button type="button" onClick={() => setImageDataUrl("")} aria-label="Rimuovi foto">×</button></div>}
               <div className="cuttingSaveButtons">
                 {editingCalculationId && <button type="button" onClick={resetCalculationForm} disabled={busy}>Annulla modifica</button>}
                 <button type="button" className="primary" onClick={handleSave} disabled={busy || !validCalculation}><Save size={17} />{busy ? "Salvataggio…" : editingCalculationId ? "Salva modifiche" : "Salva nello storico"}</button>
