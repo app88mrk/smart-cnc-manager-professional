@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ChevronDown,
   History,
+  Image as ImageIcon,
   Library,
   Pencil,
   Printer,
@@ -1142,6 +1143,7 @@ function SavedCalculations({
 }) {
   const [query, setQuery] = useState("");
   const [visibleLimit, setVisibleLimit] = useState(24);
+  const [previewImage, setPreviewImage] = useState<{ src: string; title: string } | null>(null);
   const matchingRecords = records
     .filter((record) => savedOperation(record) === operation)
     .sort(
@@ -1225,6 +1227,13 @@ function SavedCalculations({
                     ? ` · ${savedText(record.notes, "Strategia")}`
                     : ""}
                 </small>
+                <div className="cuttingSavedPhotoSlot">
+                  {record.imageDataUrl ? (
+                    <button type="button" className="cuttingSavedPhoto" onClick={() => setPreviewImage({ src: record.imageDataUrl!, title: record.title })} aria-label={`Apri foto di ${record.title}`} title="Apri foto a schermo intero">
+                      <ImageIcon size={18} />
+                    </button>
+                  ) : <span className="cuttingSavedPhotoEmpty" aria-hidden="true" />}
+                </div>
                 <div className="cuttingSavedActions">
                   <button
                     type="button"
@@ -1286,6 +1295,12 @@ function SavedCalculations({
         >
           Mostra altri parametri
         </button>
+      )}
+      {previewImage && (
+        <div className="cuttingPhotoLightbox" role="dialog" aria-modal="true" aria-label={`Foto ${previewImage.title}`} onClick={() => setPreviewImage(null)}>
+          <button type="button" className="cuttingPhotoClose" onClick={() => setPreviewImage(null)} aria-label="Chiudi foto"><X size={20} /></button>
+          <img src={previewImage.src} alt={`Foto allegata a ${previewImage.title}`} onClick={(event) => event.stopPropagation()} />
+        </div>
       )}
     </section>
   );
