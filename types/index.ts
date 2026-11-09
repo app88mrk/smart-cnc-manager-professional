@@ -178,7 +178,7 @@ export interface RecordItem {
   filePath?: string;
   fileType?: string;
   fileSize?: number;
-  imageDataUrl?: string;
+  imageDataUrl?: string | null;
   tool?: ToolDetails;
   jobSheet?: JobSheetDetails;
   manual?: ManualDetails;

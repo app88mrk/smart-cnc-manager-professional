@@ -902,7 +902,7 @@ export default function CuttingParametersPage({
         notes,
         createdAt: existingRecord?.createdAt || now,
         updatedAt: now,
-        imageDataUrl: imageDataUrl || undefined,
+        imageDataUrl: imageDataUrl || null,
       });
       notifySuccess(
         editingCalculationId
