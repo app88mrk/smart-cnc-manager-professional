@@ -701,7 +701,7 @@ export default function CuttingParametersPage({
         resetCalculationForm();
       }
 
-      notifySuccess(`Calcolo “${record.title}” eliminato dallo storico.`);
+      notifySuccess(`Calcolo “${record.title}” eliminato dai parametri salvati.`);
     } catch {
       // L'errore viene già mostrato da useRecords.
     }
@@ -737,7 +737,7 @@ export default function CuttingParametersPage({
 
     const label = operationLabels[operation].toLowerCase();
     const confirmed = window.confirm(
-      `Eliminare definitivamente tutto lo storico di ${label} (${recordsToDelete.length} elementi)? Cataloghi, manuali e utensili non verranno eliminati.`
+      `Eliminare definitivamente tutti i parametri salvati di ${label} (${recordsToDelete.length} elementi)? Cataloghi, manuali e utensili non verranno eliminati.`
     );
 
     if (!confirmed) return;
@@ -754,7 +754,7 @@ export default function CuttingParametersPage({
       }
 
       notifySuccess(
-        `Storico di ${label} eliminato correttamente.`
+        `Parametri salvati di ${label} eliminati correttamente.`
       );
     } catch {
       // L'errore viene già mostrato da useRecords.
@@ -907,7 +907,7 @@ export default function CuttingParametersPage({
       notifySuccess(
         editingCalculationId
           ? `Calcolo “${calculationName.trim()}” modificato.`
-          : `Calcolo “${calculationName.trim()}” salvato nello storico.`
+          : `Calcolo “${calculationName.trim()}” salvato nei parametri salvati.`
       );
       resetCalculationForm();
     } catch {
@@ -923,7 +923,7 @@ export default function CuttingParametersPage({
           <h1>Parametri di taglio</h1>
           <p>
             Un flusso ordinato: scegli i dati, calcola, verifica e salva.
-            Cataloghi e storico restano in aree separate.
+            Cataloghi e parametri salvati restano in aree separate.
           </p>
         </div>
         <div className="cuttingHeadIcon" aria-hidden="true">
@@ -948,7 +948,7 @@ export default function CuttingParametersPage({
         </button>
         <button type="button" className={section === "history" ? "active" : ""} onClick={() => setSection("history")}>
           <span><History size={19} /></span>
-          <div><b>Storico</b><small>Calcoli salvati</small></div>
+          <div><b>Parametri salvati</b><small>Calcoli salvati</small></div>
           <em>{savedCalculations.length}</em>
         </button>
       </nav>
@@ -1080,7 +1080,7 @@ export default function CuttingParametersPage({
           </section>
 
           <section className="cuttingFlowStep cuttingSaveStep">
-            <header className="cuttingFlowHead"><span>4</span><div><small>ARCHIVIAZIONE</small><h2>Salva il calcolo</h2><p>Assegna un nome chiaro. Lo ritroverai nella sezione Storico.</p></div></header>
+            <header className="cuttingFlowHead"><span>4</span><div><small>ARCHIVIAZIONE</small><h2>Salva il calcolo</h2><p>Assegna un nome chiaro. Lo ritroverai in Parametri salvati.</p></div></header>
             {localError && <div className="cuttingWarning error"><AlertTriangle size={18} />{localError}</div>}
             <div className="cuttingActions">
               <label className="cuttingSaveName"><span>Nome del calcolo *</span><input value={calculationName} onChange={(event) => { setCalculationName(event.target.value); setLocalError(""); }} placeholder={`Es. ${operationLabels[operation]} supporto 125`} maxLength={80} /></label>
@@ -1088,7 +1088,7 @@ export default function CuttingParametersPage({
               {imageDataUrl && <div className="cuttingSaveImagePreview"><img src={imageDataUrl} alt="Anteprima foto allegata" /><button type="button" onClick={() => setImageDataUrl("")} aria-label="Rimuovi foto">×</button></div>}
               <div className="cuttingSaveButtons">
                 {editingCalculationId && <button type="button" onClick={resetCalculationForm} disabled={busy}>Annulla modifica</button>}
-                <button type="button" className="primary" onClick={handleSave} disabled={busy || !validCalculation}><Save size={17} />{busy ? "Salvataggio…" : editingCalculationId ? "Salva modifiche" : "Salva nello storico"}</button>
+                <button type="button" className="primary" onClick={handleSave} disabled={busy || !validCalculation}><Save size={17} />{busy ? "Salvataggio…" : editingCalculationId ? "Salva modifiche" : "Salva nei parametri salvati"}</button>
               </div>
             </div>
           </section>
@@ -1111,7 +1111,7 @@ export default function CuttingParametersPage({
 
       {section === "history" && (
         <div className="cuttingStandaloneSection">
-          <header><span><Archive size={21} /></span><div><small>RISULTATI CONSOLIDATI</small><h2>Storico dei calcoli</h2><p>Consulta, modifica, stampa o riutilizza i calcoli salvati.</p></div></header>
+          <header><span><Archive size={21} /></span><div><small>RISULTATI CONSOLIDATI</small><h2>Parametri salvati</h2><p>Consulta, modifica, stampa o riutilizza i calcoli salvati.</p></div></header>
           <div className="cuttingHistoryOperationSwitch">
             {(["milling", "drilling", "turning"] as CuttingOperation[]).map((value) => <button key={value} type="button" className={operation === value ? "active" : ""} onClick={() => { setOperation(value); setTab(value); }}>{operationLabels[value]}<em>{savedCalculations.filter((record) => savedOperation(record) === value).length}</em></button>)}
           </div>
@@ -1176,7 +1176,7 @@ function SavedCalculations({
               disabled={busy}
             >
               <Trash2 size={14} />
-              Elimina storico
+              Elimina parametri salvati
             </button>
           )}
         </div>
@@ -1193,7 +1193,7 @@ function SavedCalculations({
               setVisibleLimit(24);
             }}
             placeholder="Cerca nome, codice articolo, macchina, Vc o avanzamento…"
-            aria-label="Cerca nello storico del calcolo"
+            aria-label="Cerca nei parametri salvati"
           />
           <small>
             {filteredRecords.length} risultati
