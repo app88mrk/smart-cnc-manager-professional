@@ -787,7 +787,7 @@ export default function CuttingParametersPage({
   }
 
   function printSavedCalculation(record: RecordItem) {
-    const printWindow = window.open("", "_blank", "width=900,height=760");
+    const printWindow = window.open("", "_blank");
 
     if (!printWindow) {
       setLocalError(
@@ -807,7 +807,7 @@ export default function CuttingParametersPage({
       })
       .join("");
 
-    printWindow.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${escapeHtml(record.title)}</title><style>body{font-family:Arial,sans-serif;color:#10243d;margin:34px}header{border-bottom:3px solid #1769e0;padding-bottom:14px;margin-bottom:22px}header span{color:#1769e0;font-weight:700;font-size:12px}h1{margin:5px 0;font-size:26px}p{color:#53697d}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #d8e2eb;padding:8px 10px;text-align:left;vertical-align:top}th{width:32%;background:#eef5fc}footer{margin-top:22px;color:#718395;font-size:10px}@media print{button{display:none}}</style></head><body><header><span>SMART CNC MANAGER · SCHEDA DI LAVORAZIONE</span><h1>${escapeHtml(record.title)}</h1><p>${escapeHtml(record.subtitle)}</p></header><table>${rows}</table><footer>Documento generato il ${escapeHtml(new Date().toLocaleString("it-IT"))}. Verificare sempre i dati del costruttore e i limiti della macchina.</footer><script>window.onload=()=>window.print();<\/script></body></html>`);
+    printWindow.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${escapeHtml(record.title)} · PDF</title><style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#10243d;background:#eef3f8;margin:0;padding:28px}main{max-width:1100px;margin:0 auto;background:white;padding:38px;box-shadow:0 8px 30px #10243d22}header{border-bottom:3px solid #1769e0;padding-bottom:14px;margin-bottom:22px}header span{color:#1769e0;font-weight:700;font-size:12px}h1{margin:5px 0;font-size:26px}p{color:#53697d}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #d8e2eb;padding:8px 10px;text-align:left;vertical-align:top}th{width:32%;background:#eef5fc}.toolbar{position:sticky;top:0;display:flex;justify-content:flex-end;margin:-20px 0 18px}.toolbar button{border:0;border-radius:8px;padding:10px 14px;background:#1769e0;color:white;font-weight:700;cursor:pointer}footer{margin-top:22px;color:#718395;font-size:10px}@media print{body{background:white;padding:0}main{box-shadow:none;max-width:none;padding:0}.toolbar{display:none}}</style></head><body><main><div class="toolbar"><button type="button" onclick="window.print()">Stampa / Salva PDF</button></div><header><span>SMART CNC MANAGER · SCHEDA DI LAVORAZIONE</span><h1>${escapeHtml(record.title)}</h1><p>${escapeHtml(record.subtitle)}</p></header><table>${rows}</table><footer>Documento generato il ${escapeHtml(new Date().toLocaleString("it-IT"))}. Verificare sempre i dati del costruttore e i limiti della macchina.</footer></main></body></html>`);
     printWindow.document.close();
   }
 
