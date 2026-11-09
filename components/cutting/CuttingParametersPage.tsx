@@ -1145,7 +1145,7 @@ function SavedCalculations({
   const normalizedQuery = query.trim().toLowerCase();
   const filteredRecords = normalizedQuery
     ? matchingRecords.filter((record) =>
-        `${record.title} ${record.subtitle} ${record.notes}`
+        `${record.title} ${record.subtitle} ${record.notes} ${record.machine || ""}`
           .toLowerCase()
           .includes(normalizedQuery)
       )
@@ -1174,23 +1174,23 @@ function SavedCalculations({
         </div>
       </div>
 
-      {matchingRecords.length > 12 && (
         <div className="cuttingHistorySearch">
+          <label htmlFor="cutting-history-search">Cerca nei calcoli salvati</label>
           <input
+            id="cutting-history-search"
             type="search"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
               setVisibleLimit(24);
             }}
-            placeholder="Cerca codice articolo, descrizione, Vc o avanzamento…"
+            placeholder="Cerca nome, codice articolo, macchina, Vc o avanzamento…"
             aria-label="Cerca nello storico del calcolo"
           />
           <small>
             {filteredRecords.length} risultati
           </small>
         </div>
-      )}
 
       {filteredRecords.length ? (
         <div className="cuttingSavedGrid">
