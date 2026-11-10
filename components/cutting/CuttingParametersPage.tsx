@@ -7,6 +7,7 @@ import {
   Calculator,
   CheckCircle2,
   ChevronDown,
+  Copy,
   History,
   Image as ImageIcon,
   Library,
@@ -567,6 +568,13 @@ export default function CuttingParametersPage({
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function duplicateSavedCalculation(record: RecordItem) {
+    editSavedCalculation(record);
+    setEditingCalculationId("");
+    setCalculationName(`${record.title} - copia`);
+    setFavorite(false);
+  }
+
   function useCatalogParameter(record: RecordItem) {
     const parameterOperation = savedOperation(record);
 
@@ -1115,7 +1123,7 @@ export default function CuttingParametersPage({
           <div className="cuttingHistoryOperationSwitch">
             {(["milling", "drilling", "turning"] as CuttingOperation[]).map((value) => <button key={value} type="button" className={operation === value ? "active" : ""} onClick={() => { setOperation(value); setTab(value); }}>{operationLabels[value]}<em>{savedCalculations.filter((record) => savedOperation(record) === value).length}</em></button>)}
           </div>
-          <SavedCalculations records={savedCalculations} operation={operation} busy={busy} onEdit={editSavedCalculation} onDelete={removeSavedCalculation} onClear={clearSavedHistory} onFavorite={toggleSavedFavorite} onPrint={printSavedCalculation} />
+          <SavedCalculations records={savedCalculations} operation={operation} busy={busy} onEdit={editSavedCalculation} onDuplicate={duplicateSavedCalculation} onDelete={removeSavedCalculation} onClear={clearSavedHistory} onFavorite={toggleSavedFavorite} onPrint={printSavedCalculation} />
         </div>
       )}
     </section>
@@ -1127,6 +1135,7 @@ function SavedCalculations({
   operation,
   busy,
   onEdit,
+  onDuplicate,
   onDelete,
   onClear,
   onFavorite,
@@ -1136,6 +1145,7 @@ function SavedCalculations({
   operation: CuttingOperation;
   busy: boolean;
   onEdit: (record: RecordItem) => void;
+  onDuplicate: (record: RecordItem) => void;
   onDelete: (record: RecordItem) => void | Promise<void>;
   onClear: (records: RecordItem[]) => void | Promise<void>;
   onFavorite: (record: RecordItem) => void | Promise<void>;
@@ -1245,6 +1255,10 @@ function SavedCalculations({
                   >
                     <Pencil size={15} />
                     Modifica
+                  </button>
+                  <button type="button" onClick={() => onDuplicate(record)} disabled={busy} title="Duplica calcolo" aria-label={`Duplica ${record.title}`}>
+                    <Copy size={15} />
+                    Duplica
                   </button>
                   <button
                     type="button"

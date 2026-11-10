@@ -142,3 +142,4 @@
 .cuttingPdfToolbar .cuttingPdfExit{display:inline-flex;align-items:center;gap:5px;background:#eef3f8;color:#10243d;border:1px solid #cbd9e4}
 /* Keep the in-app PDF preview above the application header. */
 .cuttingPdfLightbox{z-index:99999!important;padding:92px 24px 24px!important;}
+.cuttingSavedActions{flex-wrap:wrap}.cuttingSavedActions button{white-space:nowrap}
